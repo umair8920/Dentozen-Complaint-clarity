@@ -21,9 +21,9 @@ const VIDEOS: VideoEntry[] = [
     url: "https://www.youtube.com/watch?v=rU60QTdrIeE",
   },
   {
-    fallbackTitle: "CQC Approval Made Easy with AIOM Software - Review Worth Sharing",
+    fallbackTitle: "Meet Dr. Safa, the smile behind Serene Dental in Knightsbridge.",
     fallbackAuthor: "Smart Dental Compliance & Training",
-    url: "https://www.youtube.com/watch?v=ybRyHlzYjoI",
+    url: "https://www.youtube.com/watch?v=xabMX6nK5ck",
   },
   {
     fallbackTitle: "Review",
