@@ -4,7 +4,7 @@ export const SITE = {
   short: "SDC&T",
   tagline: "Stress-free CQC compliance for your dental practice.",
   email: "smartdentalcompliance@gmail.com",
-  phone: "+44 0800 689 1061",
+  phone: "0800 689 1061",
   location: "13 Queen Annes Place EN1 2QR London",
   calendlyUrl: "https://calendly.com/YOUR-LINK",
   social: {
