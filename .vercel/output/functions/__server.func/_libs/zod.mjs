@@ -3570,6 +3570,7 @@ ZodPromise.create;
 ZodOptional.create;
 ZodNullable.create;
 export {
+  ZodIssueCode as Z,
   literalType as l,
   objectType as o,
   stringType as s

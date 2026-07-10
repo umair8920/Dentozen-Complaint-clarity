@@ -6,7 +6,6 @@ export const SITE = {
   email: "smartdentalcompliance@gmail.com",
   phone: "0800 689 1061",
   location: "13 Queen Annes Place EN1 2QR London",
-  calendlyUrl: "https://calendly.com/YOUR-LINK",
   social: {
     linkedin: "#",
     instagram: "#",
