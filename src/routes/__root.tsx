@@ -78,7 +78,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Smart Dental Compliance & Training — Stress-free CQC compliance" },
-      { name: "description", content: "UK dental practice CQC compliance, mock inspections, training and managed compliance — all under one roof." },
+      {
+        name: "description",
+        content:
+          "UK dental practice CQC compliance, mock inspections, training and managed compliance — all under one roof.",
+      },
       { name: "author", content: "Smart Dental Compliance & Training" },
       { property: "og:site_name", content: "Smart Dental Compliance & Training" },
       { property: "og:type", content: "website" },

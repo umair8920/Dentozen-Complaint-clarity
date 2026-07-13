@@ -19,7 +19,9 @@ export function SectionHeading({
         </span>
       )}
       <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h2>
-      {description && <p className="mt-4 text-base text-muted-foreground sm:text-lg">{description}</p>}
+      {description && (
+        <p className="mt-4 text-base text-muted-foreground sm:text-lg">{description}</p>
+      )}
     </div>
   );
 }

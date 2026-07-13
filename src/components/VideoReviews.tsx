@@ -38,8 +38,14 @@ const VIDEOS: VideoEntry[] = [
 ];
 
 const TEXT_REVIEWS = [
-  { quote: "Made our CQC inspection a non-event. Worth every penny.", author: "Practice Owner, London" },
-  { quote: "One company, all our certificates in one place - finally.", author: "Practice Manager, Glasgow" },
+  {
+    quote: "Made our CQC inspection a non-event. Worth every penny.",
+    author: "Practice Owner, London",
+  },
+  {
+    quote: "One company, all our certificates in one place - finally.",
+    author: "Practice Manager, Glasgow",
+  },
 ];
 
 function extractYouTubeVideoId(url: string) {
@@ -47,7 +53,9 @@ function extractYouTubeVideoId(url: string) {
     const parsedUrl = new URL(url);
     const shortId = parsedUrl.hostname.includes("youtu.be") ? parsedUrl.pathname.slice(1) : null;
     const watchId = parsedUrl.searchParams.get("v");
-    const embedId = parsedUrl.pathname.startsWith("/embed/") ? parsedUrl.pathname.split("/embed/")[1] : null;
+    const embedId = parsedUrl.pathname.startsWith("/embed/")
+      ? parsedUrl.pathname.split("/embed/")[1]
+      : null;
 
     return shortId || watchId || embedId || "";
   } catch {
@@ -125,7 +133,9 @@ export function VideoReviews() {
         return;
       }
 
-      const nextMeta = Object.fromEntries(metaEntries.filter((entry): entry is readonly [string, VideoMeta] => Boolean(entry)));
+      const nextMeta = Object.fromEntries(
+        metaEntries.filter((entry): entry is readonly [string, VideoMeta] => Boolean(entry)),
+      );
       startTransition(() => setVideoMeta(nextMeta));
     }
 
@@ -143,7 +153,9 @@ export function VideoReviews() {
           <span className="inline-block rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wider text-magenta">
             What our clients say
           </span>
-          <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Trusted by dental practices across the UK</h2>
+          <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">
+            Trusted by dental practices across the UK
+          </h2>
         </div>
 
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -152,7 +164,9 @@ export function VideoReviews() {
             const meta = videoId ? videoMeta[videoId] : null;
             const title = meta?.title || video.fallbackTitle;
             const author = meta?.authorName || video.fallbackAuthor;
-            const thumbnailUrl = meta?.thumbnailUrl || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "");
+            const thumbnailUrl =
+              meta?.thumbnailUrl ||
+              (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "");
             const embedUrl = meta?.embedUrl || (videoId ? buildEmbedUrl(videoId) : "");
             const isActive = activeVideoId === videoId;
 
@@ -161,9 +175,13 @@ export function VideoReviews() {
                 key={`${video.url}-${index}`}
                 className="group"
                 onMouseEnter={() => videoId && setActiveVideoId(videoId)}
-                onMouseLeave={() => setActiveVideoId((currentId) => (currentId === videoId ? null : currentId))}
+                onMouseLeave={() =>
+                  setActiveVideoId((currentId) => (currentId === videoId ? null : currentId))
+                }
                 onFocus={() => videoId && setActiveVideoId(videoId)}
-                onBlur={() => setActiveVideoId((currentId) => (currentId === videoId ? null : currentId))}
+                onBlur={() =>
+                  setActiveVideoId((currentId) => (currentId === videoId ? null : currentId))
+                }
               >
                 <div className="relative aspect-[9/12] overflow-hidden rounded-2xl bg-ink shadow-soft">
                   {embedUrl && isActive ? (
@@ -198,7 +216,9 @@ export function VideoReviews() {
                         aria-label={`Play ${title}`}
                         onClick={() => videoId && setActiveVideoId(videoId)}
                       />
-                      <div className="absolute bottom-3 left-3 right-3 z-10 text-xs text-white/80">Hover to autoplay</div>
+                      <div className="absolute bottom-3 left-3 right-3 z-10 text-xs text-white/80">
+                        Hover to autoplay
+                      </div>
                     </>
                   )}
                 </div>
@@ -213,9 +233,14 @@ export function VideoReviews() {
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
           {TEXT_REVIEWS.map((review) => (
-            <blockquote key={review.author} className="rounded-2xl border border-border bg-background p-6 shadow-soft">
+            <blockquote
+              key={review.author}
+              className="rounded-2xl border border-border bg-background p-6 shadow-soft"
+            >
               <div className="flex gap-0.5 text-gold">
-                {Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-gold" />)}
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} className="h-4 w-4 fill-gold" />
+                ))}
               </div>
               <p className="mt-3 text-foreground">"{review.quote}"</p>
               <footer className="mt-3 text-sm text-muted-foreground">- {review.author}</footer>

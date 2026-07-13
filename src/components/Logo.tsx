@@ -1,6 +1,12 @@
 import logo from "../assets/logo_1.svg";
 
-export function Logo({ className = "", compact = false }: { className?: string; compact?: boolean }) {
+export function Logo({
+  className = "",
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
   return (
     <img
       src={logo}

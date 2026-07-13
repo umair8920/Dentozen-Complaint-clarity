@@ -16,7 +16,11 @@ export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
       { title: "Contact - SDC&T" },
-      { name: "description", content: "Get in touch with Smart Dental Compliance & Training. Contact form, phone, email, and direct booking." },
+      {
+        name: "description",
+        content:
+          "Get in touch with Smart Dental Compliance & Training. Contact form, phone, email, and direct booking.",
+      },
       { property: "og:title", content: "Contact - SDC&T" },
       { property: "og:description", content: "Contact Smart Dental Compliance & Training." },
       { property: "og:url", content: "/contact" },
@@ -26,7 +30,14 @@ export const Route = createFileRoute("/contact")({
   component: ContactPage,
 });
 
-const INTERESTS = ["Packages", "Mock Inspection", "Due Diligence", "Managed Service", "New Practice Setup", "Other"];
+const INTERESTS = [
+  "Packages",
+  "Mock Inspection",
+  "Due Diligence",
+  "Managed Service",
+  "New Practice Setup",
+  "Other",
+];
 
 const INITIAL_FORM = {
   name: "",
@@ -66,13 +77,20 @@ function ContactPage() {
     <SiteLayout>
       <section className="bg-surface px-4 py-12 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <SectionHeading eyebrow="Contact" title="Talk to a dental compliance specialist" description="We'll get back within one working day - or book a call directly." />
+          <SectionHeading
+            eyebrow="Contact"
+            title="Talk to a dental compliance specialist"
+            description="We'll get back within one working day - or book a call directly."
+          />
         </div>
       </section>
 
       <section className="px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.4fr_1fr]">
-          <form onSubmit={onSubmit} className="rounded-3xl border border-border bg-background p-6 shadow-soft sm:p-8">
+          <form
+            onSubmit={onSubmit}
+            className="rounded-3xl border border-border bg-background p-6 shadow-soft sm:p-8"
+          >
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="name">Your name *</Label>
@@ -145,7 +163,11 @@ function ContactPage() {
               </div>
             </div>
 
-            <Button type="submit" disabled={isSubmitting} className="mt-5 w-full rounded-full gradient-purple-orange text-white sm:w-auto">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="mt-5 w-full rounded-full gradient-purple-orange text-white sm:w-auto"
+            >
               {isSubmitting ? "Sending..." : "Send message"}
             </Button>
           </form>
@@ -176,7 +198,9 @@ function ContactPage() {
             </div>
             <div className="rounded-3xl gradient-blue-teal p-6 text-white shadow-soft">
               <h3 className="text-lg font-bold">Prefer to book?</h3>
-              <p className="mt-1 text-sm text-white/90">Grab a slot in our calendar - it takes 2 minutes.</p>
+              <p className="mt-1 text-sm text-white/90">
+                Grab a slot in our calendar - it takes 2 minutes.
+              </p>
               <Button asChild className="mt-4 rounded-full bg-white text-teal hover:bg-white/90">
                 <Link to="/book">
                   <Calendar className="mr-2 h-4 w-4" /> Book a call

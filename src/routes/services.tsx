@@ -143,7 +143,9 @@ function ServicesPage() {
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-3">
               <Button asChild className="rounded-full bg-white text-teal hover:bg-white/90">
-                <Link to="/build-your-package">Build Your Package</Link>
+                <Link to="/build-your-package" search={{ selection: undefined }}>
+                  Build Your Package
+                </Link>
               </Button>
               <Button
                 asChild

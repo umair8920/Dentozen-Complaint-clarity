@@ -75,7 +75,12 @@
   --input: oklch(0.92 0.01 250);
   --ring: oklch(0.5 0.21 335);
 
-  --gradient-hero: linear-gradient(135deg, var(--brand-teal) 0%, var(--brand-magenta) 60%, var(--brand-orange) 100%);
+  --gradient-hero: linear-gradient(
+    135deg,
+    var(--brand-teal) 0%,
+    var(--brand-magenta) 60%,
+    var(--brand-orange) 100%
+  );
   --gradient-teal-purple: linear-gradient(135deg, var(--brand-teal), var(--brand-magenta));
   --gradient-purple-orange: linear-gradient(135deg, var(--brand-magenta), var(--brand-orange));
   --gradient-orange-gold: linear-gradient(135deg, var(--brand-orange), var(--brand-gold));
@@ -102,7 +107,12 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
     font-weight: 700;
@@ -141,8 +151,14 @@
 }
 
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 @utility animate-fade-up {
   animation: fade-up 0.6s ease-out both;

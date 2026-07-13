@@ -95,7 +95,9 @@ export function Header() {
 
         <div className="hidden items-center gap-2 lg:flex">
           <Button asChild variant="outline" className="rounded-full border-2">
-            <Link to="/build-your-package">Build Your Package</Link>
+            <Link to="/build-your-package" search={{ selection: undefined }}>
+              Build Your Package
+            </Link>
           </Button>
           <Button
             asChild
@@ -134,7 +136,9 @@ export function Header() {
                 className="flex-1 rounded-full"
                 onClick={() => setOpen(false)}
               >
-                <Link to="/build-your-package">Build Package</Link>
+                <Link to="/build-your-package" search={{ selection: undefined }}>
+                  Build Package
+                </Link>
               </Button>
               <Button
                 asChild
