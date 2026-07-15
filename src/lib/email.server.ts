@@ -2,6 +2,8 @@ import nodemailer from "nodemailer";
 
 import { getServerConfig } from "./config.server";
 import { decodeSelection, selectionSummary } from "./package-selection";
+import { ITEMS } from "./pricing";
+import { toPriceItems } from "./service-content";
 
 type ContactEmailInput = {
   name: string;
@@ -48,6 +50,16 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+async function getPackagePriceItems() {
+  try {
+    const { ServiceContentService } = await import("../../server/services/service-content.service");
+    return toPriceItems(await ServiceContentService.listPublic("build-your-package"), ITEMS);
+  } catch (error) {
+    console.error("Falling back to static package pricing for email summary.", error);
+    return ITEMS;
+  }
 }
 
 export async function sendContactEmail(input: ContactEmailInput) {
@@ -129,7 +141,9 @@ export async function sendBookingEmail(input: BookingEmailInput) {
   const packageSelection = input.packageSelection?.trim()
     ? decodeSelection(input.packageSelection)
     : {};
-  const packageSummary = input.packageSummary?.trim() || selectionSummary(packageSelection);
+  const packagePriceItems = await getPackagePriceItems();
+  const packageSummary =
+    input.packageSummary?.trim() || selectionSummary(packageSelection, packagePriceItems);
   const packageTotalLine = input.packageTotal?.trim() ? input.packageTotal.trim() : "";
   const packageBlock = packageSummary.trim()
     ? `\n\n${packageSummary}${packageTotalLine ? `\n${packageTotalLine}` : ""}`
@@ -196,7 +210,7 @@ export async function sendPackageQuoteEmail(input: PackageQuoteInput) {
   const toEmail = getRequiredEnvValue(config.contactFormToEmail, "CONTACT_FORM_TO_EMAIL");
   const fromEmail = getRequiredEnvValue(config.smtpFromEmail, "SMTP_FROM_EMAIL");
   const selectionData = decodeSelection(input.selection);
-  const summary = selectionSummary(selectionData);
+  const summary = selectionSummary(selectionData, await getPackagePriceItems());
 
   await transporter.sendMail({
     to: input.email,

@@ -1,405 +1,371 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
-  Calendar,
+  ArrowRight,
+  CalendarDays,
   CheckCircle2,
-  CreditCard,
-  Mail,
-  Phone,
-  ShieldCheck,
-  Sparkles,
+  Loader2,
+  LockKeyhole,
+  UserPlus,
 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { SiteLayout } from "@/components/SiteLayout";
 import { SectionHeading } from "@/components/SectionHeading";
+import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { BOOKING_SERVICES, getBookingService } from "@/lib/booking";
-import { bookingFormSchema, submitBookingForm } from "@/lib/api/booking.functions";
-import { decodeSelection, selectionSummary, selectionToLines } from "@/lib/package-selection";
-import { SITE } from "@/lib/site-config";
+import { Card, CardContent } from "@/components/ui/card";
+import { createBookingSelection } from "@/lib/api/user-bookings.functions";
+import { getCurrentUser } from "@/lib/api/auth.functions";
+import { getPublicServiceItems } from "@/lib/api/service-content.functions";
+import { getBookingService } from "@/lib/booking";
+import { decodeSelection, selectionSummary } from "@/lib/package-selection";
+import { ITEMS } from "@/lib/pricing";
+import { savePendingBookingSelection } from "@/lib/pending-booking";
+import {
+  toPackageCards,
+  toPriceItems,
+  toServiceCards,
+  type PackageCardContent,
+  type ServiceCardContent,
+} from "@/lib/service-content";
 
 type BookSearch = {
   service?: string;
+  package?: string;
   selection?: string;
 };
 
 export const Route = createFileRoute("/book")({
   validateSearch: (search: Record<string, unknown>): BookSearch => ({
     service: typeof search.service === "string" ? search.service : undefined,
+    package: typeof search.package === "string" ? search.package : undefined,
     selection: typeof search.selection === "string" ? search.selection : undefined,
   }),
   head: () => ({
     meta: [
-      { title: "Book Now - SDC&T" },
+      { title: "Continue Booking - SDC&T" },
       {
         name: "description",
         content:
-          "Submit a provisional booking request for dental compliance services and receive confirmation by email.",
+          "Continue your selected dental compliance booking through the secure dashboard portal.",
       },
-      { property: "og:title", content: "Book Now - SDC&T" },
-      { property: "og:description", content: "Request a booking for dental compliance services." },
+      { property: "og:title", content: "Continue Booking - SDC&T" },
+      {
+        property: "og:description",
+        content: "Save your selected service or package and complete booking details securely.",
+      },
       { property: "og:url", content: "/book" },
     ],
     links: [{ rel: "canonical", href: "/book" }],
   }),
+  loader: async () => {
+    const [services, packages, builder] = await Promise.all([
+      getPublicServiceItems({ data: { section: "services" } }),
+      getPublicServiceItems({ data: { section: "packages" } }),
+      getPublicServiceItems({ data: { section: "build-your-package" } }),
+    ]);
+
+    return { services: services.items, packages: packages.items, builder: builder.items };
+  },
   component: BookPage,
 });
 
-const INITIAL_FORM = {
-  fullName: "",
-  email: "",
-  telephone: "",
-  nameOfPractice: "",
-  serviceRequired: BOOKING_SERVICES[0].value,
-  bookingDates: "",
-  bookingTime: "",
-  delegates: "",
-  paymentLink: getBookingService(BOOKING_SERVICES[0].value)?.paymentLink ?? "",
-};
-
 function BookPage() {
   const search = Route.useSearch();
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const isCalculatorFlow = Boolean(search.selection) && !search.service;
-  const packageSelection = useMemo(() => decodeSelection(search.selection), [search.selection]);
-  const packageLines = useMemo(() => selectionToLines(packageSelection), [packageSelection]);
-  const packageSummary = useMemo(() => selectionSummary(packageSelection), [packageSelection]);
+  const navigate = useNavigate();
+  const { services, packages, builder } = Route.useLoaderData();
+  const [isChecking, setIsChecking] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isAuthed, setIsAuthed] = useState(false);
+  const hasHandledSelection = useRef(false);
 
-  const selectedService = useMemo(() => {
-    if (isCalculatorFlow) {
-      return undefined;
-    }
-
-    return getBookingService(form.serviceRequired) ?? BOOKING_SERVICES[0];
-  }, [form.serviceRequired, isCalculatorFlow]);
-
-  const paymentLinkValue = isCalculatorFlow
-    ? "/build-your-package"
-    : (selectedService?.paymentLink ?? BOOKING_SERVICES[0].paymentLink);
+  const selection = useMemo(
+    () =>
+      buildPendingSelection({
+        search,
+        services: toServiceCards(services),
+        packages: toPackageCards(packages),
+        priceItems: toPriceItems(builder, ITEMS),
+      }),
+    [builder, packages, search, services],
+  );
 
   useEffect(() => {
-    if (isCalculatorFlow) {
-      setForm((current) => ({
-        ...current,
-        serviceRequired: "Package enquiry",
-        paymentLink: "/build-your-package",
-      }));
+    async function handleBookingGate() {
+      if (hasHandledSelection.current) {
+        return;
+      }
+      hasHandledSelection.current = true;
+
+      if (!selection) {
+        setIsChecking(false);
+        return;
+      }
+
+      try {
+        setIsChecking(true);
+        const current = await getCurrentUser();
+        if (!current.user) {
+          savePendingBookingSelection(selection);
+          setIsAuthed(false);
+          return;
+        }
+
+        if (current.user.role !== "user") {
+          toast.error("Please use a user account to add bookings.");
+          await navigate({ to: "/dashboard" });
+          return;
+        }
+
+        setIsAuthed(true);
+        setIsSaving(true);
+        await createBookingSelection({ data: selection });
+        toast.success("Selection added to your dashboard.");
+        await navigate({ to: "/dashboard" });
+      } catch (error) {
+        savePendingBookingSelection(selection);
+        toast.error(error instanceof Error ? error.message : "Please login to continue booking.");
+        setIsAuthed(false);
+      } finally {
+        setIsChecking(false);
+        setIsSaving(false);
+      }
+    }
+
+    void handleBookingGate();
+  }, [navigate, selection]);
+
+  const saveAndContinue = () => {
+    if (!selection) {
       return;
     }
 
-    if (!search.service) {
-      return;
-    }
-
-    const nextService = getBookingService(search.service);
-    if (!nextService) {
-      return;
-    }
-
-    setForm((current) => ({
-      ...current,
-      serviceRequired: nextService.value,
-      paymentLink: nextService.paymentLink,
-      delegates: nextService.requiresDelegates ? current.delegates : "",
-    }));
-  }, [search.service, isCalculatorFlow]);
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const parsed = bookingFormSchema.safeParse({
-      ...form,
-      paymentLink: paymentLinkValue,
-      packageSelection: search.selection ?? "",
-      packageSummary: packageSummary,
-    });
-
-    if (!parsed.success) {
-      return toast.error(parsed.error.issues[0].message);
-    }
-
-    try {
-      setIsSubmitting(true);
-      await submitBookingForm({ data: parsed.data });
-      setIsSubmitted(true);
-      toast.success("Thanks - your provisional booking request has been sent.");
-      setForm(INITIAL_FORM);
-    } catch (error) {
-      console.error(error);
-      toast.error("We couldn't send your booking request right now. Please try again in a moment.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    savePendingBookingSelection(selection);
   };
 
   return (
     <SiteLayout>
-      <section className="bg-surface px-4 py-12 sm:px-6 lg:px-8">
+      <section className="bg-surface px-4 py-14 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <SectionHeading
-            eyebrow="Book Now"
-            title="Request your provisional booking"
-            description="Choose a service, add your preferred dates, and we'll email confirmation within 3 to 5 working days."
+            eyebrow="Secure booking portal"
+            title="Continue your booking in the dashboard"
+            description="Your selected service is saved to a secure account first. From there you can add practice details, choose preferred dates, and track booking history."
+            center
           />
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {[
-              { icon: Calendar, label: "Preferred dates and timing" },
-              { icon: CreditCard, label: "Service-based payment link" },
-              { icon: ShieldCheck, label: "Provisional booking by email" },
-            ].map(({ icon: Icon, label }) => (
-              <div
-                key={label}
-                className="flex items-center gap-3 rounded-2xl border border-border bg-background p-4"
-              >
-                <span className="grid h-10 w-10 place-items-center rounded-xl gradient-teal-purple text-white">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <span className="text-sm font-semibold">{label}</span>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
       <section className="px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.4fr_1fr]">
-          {isSubmitted ? (
-            <div className="rounded-3xl border border-border bg-background p-6 shadow-soft sm:p-8 lg:col-span-2">
-              <div className="mx-auto max-w-2xl rounded-3xl gradient-teal-purple p-8 text-white shadow-glow">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/15">
-                    <CheckCircle2 className="h-6 w-6" />
-                  </span>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
-                      Thank you
+        <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <Card className="rounded-2xl shadow-soft">
+            <CardContent className="p-6 sm:p-8">
+              {selection ? (
+                <>
+                  <div className="flex items-start gap-4">
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl gradient-teal-purple text-white">
+                      {isChecking || isSaving ? (
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                      ) : isAuthed ? (
+                        <CheckCircle2 className="h-6 w-6" />
+                      ) : (
+                        <LockKeyhole className="h-6 w-6" />
+                      )}
+                    </span>
+                    <div>
+                      <h1 className="text-2xl font-extrabold tracking-tight">
+                        {selection.serviceLabel}
+                      </h1>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Source: {sourceLabel(selection.serviceSource)}
+                      </p>
                     </div>
-                    <h3 className="mt-1 text-2xl font-extrabold">
-                      Thank you for making the booking
-                    </h3>
                   </div>
-                </div>
-                <p className="mt-4 max-w-xl text-sm leading-6 text-white/90">
-                  Please note this is a provisional booking. We will send a confirmation email
-                  within 3 to 5 working days.
-                </p>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <Button
-                    onClick={() => setIsSubmitted(false)}
-                    className="rounded-full bg-white text-teal hover:bg-white/90"
-                  >
-                    Make another booking
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              <form
-                onSubmit={onSubmit}
-                className="rounded-3xl border border-border bg-background p-6 shadow-soft sm:p-8"
-              >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {packageLines.length > 0 ? (
-                    <div className="sm:col-span-2 rounded-2xl border border-border bg-muted/30 p-4">
-                      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        Package selected from calculator
-                      </div>
-                      <div className="mt-2 whitespace-pre-wrap text-sm text-foreground">
-                        {packageSummary}
-                      </div>
-                    </div>
-                  ) : null}
-                  <div>
-                    <Label htmlFor="fullName">Full Name *</Label>
-                    <Input
-                      id="fullName"
-                      required
-                      disabled={isSubmitting}
-                      value={form.fullName}
-                      onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email Address *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      required
-                      disabled={isSubmitting}
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="telephone">Telephone *</Label>
-                    <Input
-                      id="telephone"
-                      required
-                      disabled={isSubmitting}
-                      value={form.telephone}
-                      onChange={(e) => setForm({ ...form, telephone: e.target.value })}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="nameOfPractice">Name of Practice *</Label>
-                    <Input
-                      id="nameOfPractice"
-                      required
-                      disabled={isSubmitting}
-                      value={form.nameOfPractice}
-                      onChange={(e) => setForm({ ...form, nameOfPractice: e.target.value })}
-                      className="mt-1"
-                    />
-                  </div>
-                  {!isCalculatorFlow ? (
-                    <div className="sm:col-span-2">
-                      <Label htmlFor="serviceRequired">Service required *</Label>
-                      <select
-                        id="serviceRequired"
-                        required
-                        disabled={isSubmitting}
-                        value={form.serviceRequired}
-                        onChange={(e) => {
-                          const nextService =
-                            getBookingService(e.target.value) ?? BOOKING_SERVICES[0];
-                          setForm({
-                            ...form,
-                            serviceRequired: nextService.value,
-                            paymentLink: nextService.paymentLink,
-                            delegates: nextService.requiresDelegates ? form.delegates : "",
-                          });
-                        }}
-                        className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        {BOOKING_SERVICES.map((service) => (
-                          <option key={service.value} value={service.value}>
-                            {service.label}
-                          </option>
-                        ))}
-                      </select>
+
+                  {selection.packageSummary ? (
+                    <div className="mt-6 whitespace-pre-wrap rounded-2xl border border-border bg-muted/30 p-4 text-sm">
+                      {selection.packageSummary}
                     </div>
                   ) : (
-                    <input type="hidden" name="serviceRequired" value="Package enquiry" />
-                  )}
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="bookingDates">
-                      Dates you would like the booking (please provide 2-3 dates) *
-                    </Label>
-                    <Textarea
-                      id="bookingDates"
-                      required
-                      rows={4}
-                      disabled={isSubmitting}
-                      value={form.bookingDates}
-                      onChange={(e) => setForm({ ...form, bookingDates: e.target.value })}
-                      className="mt-1"
-                      placeholder="Example: 14 August 2026, 16 August 2026, or 18 August 2026"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="bookingTime">Timing of Booking *</Label>
-                    <Input
-                      id="bookingTime"
-                      required
-                      disabled={isSubmitting}
-                      value={form.bookingTime}
-                      onChange={(e) => setForm({ ...form, bookingTime: e.target.value })}
-                      className="mt-1"
-                      placeholder="e.g. Morning, afternoon, or 10:00 to 13:00"
-                    />
-                  </div>
-                  {selectedService?.requiresDelegates ? (
-                    <div>
-                      <Label htmlFor="delegates">Number of delegates *</Label>
-                      <Input
-                        id="delegates"
-                        required={selectedService.requiresDelegates}
-                        disabled={isSubmitting}
-                        value={form.delegates}
-                        onChange={(e) => setForm({ ...form, delegates: e.target.value })}
-                        className="mt-1"
-                        inputMode="numeric"
-                        placeholder="e.g. 8"
-                      />
+                    <div className="mt-6 rounded-2xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                      This selection will appear in your dashboard as a pending booking.
                     </div>
-                  ) : null}
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="paymentLink">Payment link for this service</Label>
-                    <Input
-                      id="paymentLink"
-                      readOnly
-                      value={paymentLinkValue}
-                      className="mt-1 bg-muted/40"
-                    />
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      This link changes with the selected flow and will also be included in the
-                      booking email.
+                  )}
+                </>
+              ) : (
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight">Choose a service first</h1>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    This page only continues a selected package, service, or calculator quote. Pick
+                    one from the public pages and it will be added to your dashboard.
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Button asChild className="rounded-full gradient-purple-orange text-white">
+                      <Link to="/services">View services</Link>
+                    </Button>
+                    <Button asChild variant="outline" className="rounded-full border-2">
+                      <Link to="/packages">View packages</Link>
+                    </Button>
+                    <Button asChild variant="outline" className="rounded-full border-2">
+                      <Link to="/build-your-package" search={{ selection: undefined }}>
+                        Build package
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                {[
+                  { icon: UserPlus, label: "Login or signup" },
+                  { icon: CalendarDays, label: "Choose dates" },
+                  { icon: CheckCircle2, label: "Track history" },
+                ].map(({ icon: Icon, label }) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-background p-4"
+                  >
+                    <span className="grid h-9 w-9 place-items-center rounded-xl gradient-purple-orange text-white">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="text-sm font-semibold">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl shadow-soft">
+            <CardContent className="p-6 sm:p-8">
+              {!selection ? (
+                <div className="grid min-h-72 place-items-center text-center">
+                  <div>
+                    <CheckCircle2 className="mx-auto h-8 w-8 text-teal" />
+                    <h2 className="mt-3 text-xl font-extrabold">No booking was created</h2>
+                  </div>
+                </div>
+              ) : isChecking || isSaving ? (
+                <div className="grid min-h-72 place-items-center text-center">
+                  <div>
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-magenta" />
+                    <p className="mt-3 text-sm font-semibold">
+                      {isSaving ? "Adding this to your dashboard..." : "Checking your account..."}
                     </p>
                   </div>
                 </div>
-
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="mt-5 w-full rounded-full gradient-purple-orange text-white sm:w-auto"
-                >
-                  {isSubmitting ? "Sending..." : "Submit booking request"}
-                </Button>
-              </form>
-
-              <aside className="space-y-4">
-                <div className="rounded-3xl border border-border bg-background p-6 shadow-soft">
-                  <h3 className="text-lg font-bold">What happens next</h3>
-                  <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
-                    <li className="flex items-start gap-3">
-                      <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-xl gradient-teal-purple text-white">
-                        <Sparkles className="h-4 w-4" />
-                      </span>
-                      We review your preferred dates and service.
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-xl gradient-purple-orange text-white">
-                        <Mail className="h-4 w-4" />
-                      </span>
-                      We send a confirmation email within 3 to 5 working days.
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-xl gradient-orange-gold text-white">
-                        <Phone className="h-4 w-4" />
-                      </span>
-                      Need help before submitting? Call us on {SITE.phone}.
-                    </li>
-                  </ul>
-                </div>
-                <div className="rounded-3xl gradient-blue-teal p-6 text-white shadow-soft">
-                  <h3 className="text-lg font-bold">Service-based payment link</h3>
-                  <p className="mt-1 text-sm text-white/90">
-                    {isCalculatorFlow
-                      ? "This is a package enquiry, so we hide service selection and keep the next step focused on your package."
-                      : "Choose a service to see the matching link. We&apos;ve kept it visible so the next step is obvious."}
+              ) : (
+                <div>
+                  <h2 className="text-xl font-extrabold">Login required</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    We saved your current selection in this browser. Login, signup, or continue with
+                    Google and it will be added to your user dashboard automatically.
                   </p>
-                  <div className="mt-4 rounded-2xl bg-white/15 p-4 text-sm backdrop-blur">
-                    <div className="font-semibold">
-                      {isCalculatorFlow ? "Package enquiry" : selectedService?.label}
-                    </div>
-                    <div className="mt-1 break-all text-white/85">{paymentLinkValue}</div>
+                  <div className="mt-6 space-y-3">
+                    <Button
+                      asChild
+                      className="w-full rounded-full gradient-purple-orange text-white"
+                      onClick={saveAndContinue}
+                    >
+                      <Link to="/login">
+                        Login <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full rounded-full border-2"
+                      onClick={saveAndContinue}
+                    >
+                      <Link to="/signup">
+                        Create account <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
                   </div>
                 </div>
-              </aside>
-            </>
-          )}
+              )}
+            </CardContent>
+          </Card>
         </div>
       </section>
     </SiteLayout>
   );
+}
+
+function buildPendingSelection(input: {
+  search: BookSearch;
+  services: ServiceCardContent[];
+  packages: PackageCardContent[];
+  priceItems: typeof ITEMS;
+}) {
+  if (input.search.selection) {
+    const decoded = decodeSelection(input.search.selection);
+    if (Object.keys(decoded).length === 0) {
+      return null;
+    }
+
+    return {
+      serviceKey: "custom-package",
+      serviceLabel: "Custom package",
+      serviceSource: "build-your-package",
+      paymentLink: "/build-your-package",
+      packageSelection: input.search.selection,
+      packageSummary: selectionSummary(decoded, input.priceItems),
+    };
+  }
+
+  if (input.search.package) {
+    const selectedPackage = input.packages.find((item) => item.id === input.search.package);
+    if (!selectedPackage) {
+      return null;
+    }
+
+    return {
+      serviceKey: selectedPackage.id,
+      serviceLabel: selectedPackage.name,
+      serviceSource: "packages",
+      paymentLink: "/packages",
+      packageSelection: input.search.package,
+      packageSummary: `${selectedPackage.name}\n${selectedPackage.tagline}\nPrice: £${selectedPackage.price}`,
+    };
+  }
+
+  if (input.search.service) {
+    const dbService = input.services.find((item) => item.bookingService === input.search.service);
+    const staticService = getBookingService(input.search.service);
+    if (!dbService && (!staticService || staticService.value === "other")) {
+      return null;
+    }
+
+    const paymentLink = staticService?.paymentLink ?? "/services";
+    return {
+      serviceKey: input.search.service,
+      serviceLabel: dbService?.title ?? staticService?.label ?? "Selected service",
+      serviceSource: sourceFromPaymentLink(paymentLink),
+      paymentLink,
+      packageSelection: "",
+      packageSummary: dbService?.body ?? "",
+    };
+  }
+
+  return null;
+}
+
+function sourceFromPaymentLink(paymentLink: string) {
+  if (paymentLink.includes("pricing")) return "pricing";
+  if (paymentLink.includes("packages")) return "packages";
+  if (paymentLink.includes("build-your-package")) return "build-your-package";
+  if (paymentLink.includes("services")) return "services";
+  return "direct";
+}
+
+function sourceLabel(source: string) {
+  const labels: Record<string, string> = {
+    services: "/services",
+    pricing: "/pricing",
+    "build-your-package": "/build-your-package",
+    packages: "/packages",
+    direct: "Direct booking",
+  };
+
+  return labels[source] ?? source;
 }

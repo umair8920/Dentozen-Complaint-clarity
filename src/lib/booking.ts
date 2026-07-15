@@ -17,7 +17,6 @@ export const BOOKING_SERVICES: BookingService[] = [
     requiresDelegates: true,
   },
   { value: "packages", label: "Packages", paymentLink: "/packages" },
-  { value: "other", label: "Other", paymentLink: "/contact" },
 ];
 
 export function getBookingService(value: string) {

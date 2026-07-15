@@ -4,6 +4,8 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { CTASection } from "@/components/CTASection";
 import { Button } from "@/components/ui/button";
 import { ITEMS, formatGBP, type Category } from "@/lib/pricing";
+import { getPublicServiceItems } from "@/lib/api/service-content.functions";
+import { toPriceItems } from "@/lib/service-content";
 import { encodeSelection } from "@/lib/package-selection";
 
 export const Route = createFileRoute("/pricing")({
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/pricing")({
     ],
     links: [{ rel: "canonical", href: "/pricing" }],
   }),
+  loader: async () => getPublicServiceItems({ data: { section: "pricing" } }),
   component: PricingPage,
 });
 
@@ -33,6 +36,12 @@ const CATEGORIES: Category[] = [
 ];
 
 function PricingPage() {
+  const { items } = Route.useLoaderData();
+  const priceItems = toPriceItems(
+    items,
+    ITEMS.filter((item) => item.category !== "Packages"),
+  );
+
   return (
     <SiteLayout>
       <section className="bg-surface px-4 py-16 sm:px-6 lg:px-8">
@@ -59,7 +68,7 @@ function PricingPage() {
       <section className="px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl space-y-10">
           {CATEGORIES.map((cat) => {
-            const items = ITEMS.filter((i) => i.category === cat);
+            const items = priceItems.filter((i) => i.category === cat);
             return (
               <div
                 key={cat}

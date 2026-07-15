@@ -3,7 +3,9 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { SectionHeading } from "@/components/SectionHeading";
 import { CTASection } from "@/components/CTASection";
 import { Button } from "@/components/ui/button";
-import { PACKAGES, COMPARISON_ROWS } from "@/lib/pricing";
+import { COMPARISON_ROWS } from "@/lib/pricing";
+import { getPublicServiceItems } from "@/lib/api/service-content.functions";
+import { toPackageCards } from "@/lib/service-content";
 import { Check, X } from "lucide-react";
 
 export const Route = createFileRoute("/packages")({
@@ -24,10 +26,14 @@ export const Route = createFileRoute("/packages")({
     ],
     links: [{ rel: "canonical", href: "/packages" }],
   }),
+  loader: async () => getPublicServiceItems({ data: { section: "packages" } }),
   component: PackagesPage,
 });
 
 function PackagesPage() {
+  const { items } = Route.useLoaderData();
+  const packages = toPackageCards(items);
+
   return (
     <SiteLayout>
       <section className="bg-surface px-4 py-16 sm:px-6 lg:px-8">
@@ -40,7 +46,7 @@ function PackagesPage() {
           />
 
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
-            {PACKAGES.map((p) => (
+            {packages.map((p) => (
               <div
                 key={p.id}
                 className={`relative overflow-hidden rounded-3xl border bg-background shadow-soft ${p.popular ? "border-magenta lg:-translate-y-3 shadow-card" : "border-border"}`}
@@ -70,7 +76,9 @@ function PackagesPage() {
                     asChild
                     className="mt-6 w-full rounded-full gradient-purple-orange text-white"
                   >
-                    <Link to="/book">Choose this package</Link>
+                    <Link to="/book" search={{ package: p.id }}>
+                      Choose this package
+                    </Link>
                   </Button>
                 </div>
               </div>
@@ -87,7 +95,7 @@ function PackagesPage() {
               <thead>
                 <tr className="bg-surface text-left">
                   <th className="px-6 py-4 font-semibold">Feature</th>
-                  {PACKAGES.map((p) => (
+                  {packages.map((p) => (
                     <th key={p.id} className="px-6 py-4 text-center font-semibold">
                       <div>{p.name.split(" ").slice(0, 2).join(" ")}</div>
                       <div className="text-xs font-normal text-muted-foreground">£{p.price}</div>

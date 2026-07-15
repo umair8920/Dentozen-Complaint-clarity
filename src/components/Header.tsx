@@ -1,8 +1,10 @@
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { LogOut, Menu, X } from "lucide-react";
+import { toast } from "sonner";
 import { Logo } from "./Logo";
 import { Button } from "@/components/ui/button";
+import { getCurrentUser, logout } from "@/lib/api/auth.functions";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -40,7 +42,37 @@ const desktopPricingActiveLinkClass =
   "inline-flex items-center rounded-full px-3 py-2 text-sm font-semibold text-foreground bg-muted";
 
 export function Header() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getCurrentUser()
+      .then((result) => {
+        if (isMounted) {
+          setIsLoggedIn(Boolean(result.user));
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setIsLoggedIn(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const onLogout = async () => {
+    await logout();
+    setIsLoggedIn(false);
+    setOpen(false);
+    toast.success("Logged out.");
+    await navigate({ to: "/" });
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-lg">
@@ -105,6 +137,17 @@ export function Header() {
           >
             <Link to="/book">Book Now</Link>
           </Button>
+          <Button asChild variant="outline" className="rounded-full border-2">
+            <Link to={isLoggedIn ? "/dashboard" : "/login"}>
+              {isLoggedIn ? "Dashboard" : "Login"}
+            </Link>
+          </Button>
+          {isLoggedIn ? (
+            <Button variant="ghost" className="rounded-full" onClick={onLogout}>
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
+          ) : null}
         </div>
 
         <button
@@ -148,6 +191,22 @@ export function Header() {
                 <Link to="/book">Book Now</Link>
               </Button>
             </div>
+            <Button
+              asChild
+              variant="outline"
+              className="mt-2 w-full rounded-full border-2"
+              onClick={() => setOpen(false)}
+            >
+              <Link to={isLoggedIn ? "/dashboard" : "/login"}>
+                {isLoggedIn ? "Dashboard" : "Login"}
+              </Link>
+            </Button>
+            {isLoggedIn ? (
+              <Button variant="ghost" className="w-full rounded-full" onClick={onLogout}>
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
+            ) : null}
           </div>
         </div>
       )}

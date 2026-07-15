@@ -35,11 +35,14 @@ export function decodeSelection(value: string | undefined | null): PackageSelect
   }
 }
 
-export function selectionToLines(selection: PackageSelection): SelectedLine[] {
+export function selectionToLines(
+  selection: PackageSelection,
+  availableItems: PriceItem[] = ITEMS,
+): SelectedLine[] {
   return Object.entries(selection)
     .filter(([, qty]) => qty > 0)
     .map(([id, qty]) => {
-      const item = ITEMS.find((entry) => entry.id === id);
+      const item = availableItems.find((entry) => entry.id === id);
       if (!item) {
         return null;
       }
@@ -52,8 +55,8 @@ export function selectionToLines(selection: PackageSelection): SelectedLine[] {
     .filter((line): line is SelectedLine => Boolean(line));
 }
 
-export function selectionSummary(selection: PackageSelection) {
-  const lines = selectionToLines(selection);
+export function selectionSummary(selection: PackageSelection, availableItems: PriceItem[] = ITEMS) {
+  const lines = selectionToLines(selection, availableItems);
 
   if (lines.length === 0) {
     return "No package items selected.";

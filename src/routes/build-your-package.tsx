@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ITEMS, formatGBP, type Category } from "@/lib/pricing";
+import { getPublicServiceItems } from "@/lib/api/service-content.functions";
+import { toPriceItems } from "@/lib/service-content";
 import {
   decodeSelection,
   encodeSelection,
@@ -37,6 +39,7 @@ export const Route = createFileRoute("/build-your-package")({
     ],
     links: [{ rel: "canonical", href: "/build-your-package" }],
   }),
+  loader: async () => getPublicServiceItems({ data: { section: "build-your-package" } }),
   component: BuilderPage,
 });
 
@@ -51,6 +54,8 @@ const CATEGORIES: Category[] = [
 
 function BuilderPage() {
   const search = Route.useSearch();
+  const { items } = Route.useLoaderData();
+  const priceItems = toPriceItems(items, ITEMS);
   const [sel, setSel] = useState<PackageSelection>(() => decodeSelection(search.selection));
   const [openCats, setOpenCats] = useState<Record<Category, boolean>>({
     Packages: true,
@@ -69,7 +74,7 @@ function BuilderPage() {
     setSel(decodeSelection(search.selection));
   }, [search.selection]);
 
-  const lines = useMemo(() => selectionToLines(sel), [sel]);
+  const lines = useMemo(() => selectionToLines(sel, priceItems), [priceItems, sel]);
 
   const subTotal = lines.reduce((s, l) => s + l.subTotal, 0);
   const vatTotal = lines.reduce((s, l) => s + l.vat, 0);
@@ -172,7 +177,7 @@ function BuilderPage() {
             </div>
 
             {CATEGORIES.map((cat) => {
-              const items = ITEMS.filter((i) => i.category === cat);
+              const items = priceItems.filter((i) => i.category === cat);
               const open = openCats[cat];
 
               return (
