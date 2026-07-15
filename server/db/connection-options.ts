@@ -22,7 +22,7 @@ export function createPgPoolOptions(
 ): pg.PoolConfig {
   const sslOverride = parseBoolean(env.DB_SSL);
   const url = new URL(databaseUrl);
-  const usesSupabase = url.hostname.includes("supabase.co");
+  const usesSupabase = url.hostname.includes("supabase.co") || url.hostname.includes("supabase.com");
   const sslMode = url.searchParams.get("sslmode");
   const shouldUseSsl = sslOverride ?? (usesSupabase || sslMode === "require");
   const max = Number.parseInt(env.DB_POOL_MAX ?? "", 10);

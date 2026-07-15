@@ -20,12 +20,14 @@ npm run db:seed:local
 
 ## Supabase production
 
-Create `.env.production` from `.env.production.example`, then set `DATABASE_URL` to the Supabase Postgres connection string for project `hsquitmxbeeznraphkic`.
+Use `.env.example` as the single template. For deployed environments, set `DATABASE_URL` to the Supabase **Session Pooler** connection string for project `hsquitmxbeeznraphkic`.
 
 ```env
-DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.hsquitmxbeeznraphkic.supabase.co:5432/postgres
+DATABASE_URL=postgresql://postgres.hsquitmxbeeznraphkic:[YOUR-PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres
 DB_SSL=true
 ```
+
+Use the pooler URL for deployed Node hosts. Supabase direct database URLs such as `db.hsquitmxbeeznraphkic.supabase.co` can resolve over IPv6 by default; some hosting providers do not support that path. Supabase Dashboard > Connect > Session pooler gives the IPv4-compatible Supavisor URL.
 
 Run production migrations against Supabase:
 
