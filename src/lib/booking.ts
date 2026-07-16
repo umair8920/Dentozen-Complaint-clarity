@@ -6,9 +6,9 @@ export type BookingService = {
 };
 
 export const BOOKING_SERVICES: BookingService[] = [
-  { value: "mock-inspection", label: "Mock Inspection", paymentLink: "/services" },
-  { value: "due-diligence", label: "Due Diligence", paymentLink: "/services" },
-  { value: "managed-service", label: "Managed Service", paymentLink: "/services" },
+  { value: "mock-inspection", label: "Mock Inspection", paymentLink: "/pricing" },
+  { value: "due-diligence", label: "Due Diligence", paymentLink: "/pricing" },
+  { value: "managed-service", label: "Managed Service", paymentLink: "/packages" },
   { value: "new-practice-setup", label: "New Practice Setup", paymentLink: "/squat-practices" },
   {
     value: "training-session",

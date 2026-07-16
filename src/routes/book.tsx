@@ -21,13 +21,7 @@ import { getBookingService } from "@/lib/booking";
 import { decodeSelection, selectionSummary } from "@/lib/package-selection";
 import { ITEMS } from "@/lib/pricing";
 import { savePendingBookingSelection } from "@/lib/pending-booking";
-import {
-  toPackageCards,
-  toPriceItems,
-  toServiceCards,
-  type PackageCardContent,
-  type ServiceCardContent,
-} from "@/lib/service-content";
+import { toPackageCards, toPriceItems, type PackageCardContent } from "@/lib/service-content";
 
 type BookSearch = {
   service?: string;
@@ -59,13 +53,12 @@ export const Route = createFileRoute("/book")({
     links: [{ rel: "canonical", href: "/book" }],
   }),
   loader: async () => {
-    const [services, packages, builder] = await Promise.all([
-      getPublicServiceItems({ data: { section: "services" } }),
+    const [packages, builder] = await Promise.all([
       getPublicServiceItems({ data: { section: "packages" } }),
       getPublicServiceItems({ data: { section: "build-your-package" } }),
     ]);
 
-    return { services: services.items, packages: packages.items, builder: builder.items };
+    return { packages: packages.items, builder: builder.items };
   },
   component: BookPage,
 });
@@ -73,7 +66,7 @@ export const Route = createFileRoute("/book")({
 function BookPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { services, packages, builder } = Route.useLoaderData();
+  const { packages, builder } = Route.useLoaderData();
   const [isChecking, setIsChecking] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isAuthed, setIsAuthed] = useState(false);
@@ -83,11 +76,10 @@ function BookPage() {
     () =>
       buildPendingSelection({
         search,
-        services: toServiceCards(services),
         packages: toPackageCards(packages),
         priceItems: toPriceItems(builder, ITEMS),
       }),
-    [builder, packages, search, services],
+    [builder, packages, search],
   );
 
   useEffect(() => {
@@ -201,7 +193,7 @@ function BookPage() {
                   </p>
                   <div className="mt-6 flex flex-wrap gap-3">
                     <Button asChild className="rounded-full gradient-purple-orange text-white">
-                      <Link to="/services">View services</Link>
+                      <Link to="/pricing">View pricing</Link>
                     </Button>
                     <Button asChild variant="outline" className="rounded-full border-2">
                       <Link to="/packages">View packages</Link>
@@ -293,7 +285,6 @@ function BookPage() {
 
 function buildPendingSelection(input: {
   search: BookSearch;
-  services: ServiceCardContent[];
   packages: PackageCardContent[];
   priceItems: typeof ITEMS;
 }) {
@@ -330,20 +321,19 @@ function buildPendingSelection(input: {
   }
 
   if (input.search.service) {
-    const dbService = input.services.find((item) => item.bookingService === input.search.service);
     const staticService = getBookingService(input.search.service);
-    if (!dbService && (!staticService || staticService.value === "other")) {
+    if (!staticService || staticService.value === "other") {
       return null;
     }
 
-    const paymentLink = staticService?.paymentLink ?? "/services";
+    const paymentLink = staticService.paymentLink;
     return {
       serviceKey: input.search.service,
-      serviceLabel: dbService?.title ?? staticService?.label ?? "Selected service",
+      serviceLabel: staticService.label,
       serviceSource: sourceFromPaymentLink(paymentLink),
       paymentLink,
       packageSelection: "",
-      packageSummary: dbService?.body ?? "",
+      packageSummary: "",
     };
   }
 
@@ -354,13 +344,11 @@ function sourceFromPaymentLink(paymentLink: string) {
   if (paymentLink.includes("pricing")) return "pricing";
   if (paymentLink.includes("packages")) return "packages";
   if (paymentLink.includes("build-your-package")) return "build-your-package";
-  if (paymentLink.includes("services")) return "services";
   return "direct";
 }
 
 function sourceLabel(source: string) {
   const labels: Record<string, string> = {
-    services: "/services",
     pricing: "/pricing",
     "build-your-package": "/build-your-package",
     packages: "/packages",

@@ -1,6 +1,6 @@
 create table if not exists admin_service_items (
   id uuid primary key default gen_random_uuid(),
-  section text not null check (section in ('services', 'pricing', 'build-your-package', 'packages')),
+  section text not null check (section in ('pricing', 'build-your-package', 'packages')),
   title text not null,
   description text not null default '',
   price numeric(10, 2),
@@ -15,11 +15,6 @@ create index if not exists admin_service_items_section_idx on admin_service_item
 
 insert into admin_service_items (section, title, description, price, display_order, metadata)
 values
-  ('services', 'CQC Mock Inspections', 'Full mock inspection with detailed report and action-plan support.', null, 10, '{"route":"/services","cta":"Book a mock inspection"}'),
-  ('services', 'Due Diligence Mock Inspection', 'Compliance due diligence review before practice purchase.', null, 20, '{"route":"/services","cta":"Enquire about due diligence"}'),
-  ('services', 'Smart Managed Service', 'Fully managed compliance with quarterly visits and one provider.', null, 30, '{"route":"/services","badge":"Fully managed subscription"}'),
-  ('services', 'Compliance Setup for New Practices', 'CQC registration, policies, RPA, risk assessments and launch support.', null, 40, '{"route":"/services"}'),
-  ('services', 'CQC Registration Service', 'Standalone CQC registration support for new and changing practices.', null, 50, '{"route":"/services"}'),
   ('packages', 'Essential Compliance Package', 'Meet fundamental safety and compliance requirements.', 199, 10, '{"route":"/packages","popular":false}'),
   ('packages', 'Safety & Training Package', 'Prioritise staff training and equipment safety.', 299, 20, '{"route":"/packages","popular":true}'),
   ('packages', 'Complete Compliance & Safety Package', 'Full-service solution for workplace safety.', 399, 30, '{"route":"/packages","popular":false}'),

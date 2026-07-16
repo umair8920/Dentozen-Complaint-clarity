@@ -59,10 +59,13 @@ import {
   getAdminOverview,
   getAdminServiceItems,
   getAdminUsers,
+  createAdminServiceCategory,
   createAdminServiceItem,
+  deleteAdminServiceCategory,
   deleteAdminServiceItem,
   inviteAdminUser,
   resendAdminInvite,
+  updateAdminServiceCategory,
   updateAdminServiceItem,
   updateAdminUserRole,
   updateAdminUserStatus,
@@ -691,7 +694,6 @@ function BookingDetailsDialog({
 
 function sourceLabel(source: string) {
   const labels: Record<string, string> = {
-    services: "/services",
     pricing: "/pricing",
     "build-your-package": "/build-your-package",
     packages: "/packages",
@@ -1575,9 +1577,10 @@ function TrainerSlotManagerDialog({
   );
 }
 
-type AdminTab = "dashboard" | "users" | "services";
+type AdminTab = "dashboard" | "users" | "content";
 type AdminUsersQuery = AdminUsersQueryInput;
 type ServiceItem = Awaited<ReturnType<typeof getAdminServiceItems>>["items"][number];
+type ServiceCategory = Awaited<ReturnType<typeof getAdminServiceItems>>["categories"][number];
 const INITIAL_ADMIN_USERS_QUERY: AdminUsersQuery = {
   page: 1,
   pageSize: 15,
@@ -1588,34 +1591,19 @@ const INITIAL_ADMIN_USERS_QUERY: AdminUsersQuery = {
 const ADMIN_NAV_ITEMS: AdminNavItem<AdminTab>[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "users", label: "Users", icon: Users },
-  { id: "services", label: "Services", icon: Settings2 },
+  { id: "content", label: "Content", icon: Settings2 },
 ];
 const SERVICE_SECTIONS: { id: ServiceSectionInput; label: string; route: string }[] = [
-  { id: "services", label: "Services", route: "/services" },
   { id: "pricing", label: "Pricing", route: "/pricing" },
   { id: "build-your-package", label: "Build Package", route: "/build-your-package" },
   { id: "packages", label: "Packages", route: "/packages" },
-];
-const SERVICE_ICON_OPTIONS = [
-  { value: "ClipboardCheck", label: "Checklist" },
-  { value: "Building2", label: "Building" },
-  { value: "Sparkles", label: "Managed service" },
-  { value: "Stethoscope", label: "Clinical setup" },
-  { value: "FileCheck2", label: "Registration" },
+  { id: "package-comparison", label: "Package Compare", route: "/packages" },
 ];
 const GRADIENT_OPTIONS = [
   { value: "gradient-teal-purple", label: "Teal to purple" },
   { value: "gradient-purple-orange", label: "Purple to orange" },
   { value: "gradient-orange-gold", label: "Orange to gold" },
   { value: "gradient-blue-teal", label: "Blue to teal" },
-];
-const PRICING_CATEGORY_OPTIONS = [
-  "Packages",
-  "Risk Assessments",
-  "Training",
-  "Direct 365 Services",
-  "RPA",
-  "Resources",
 ];
 const UNIT_OPTIONS = ["", "each", "month", "year", "item", "service"];
 
@@ -1739,7 +1727,7 @@ function AdminDashboard({ admin }: { admin: PublicUser }) {
           ? "Analytics"
           : activeTab === "users"
             ? "User Management"
-            : "Services"
+            : "Content"
       }
       navItems={ADMIN_NAV_ITEMS}
       onTabChange={setActiveTab}
@@ -2196,10 +2184,13 @@ function AdminServices({
   serviceData: Awaited<ReturnType<typeof getAdminServiceItems>> | null;
   onRefresh: () => Promise<void>;
 }) {
-  const [activeSection, setActiveSection] = useState<ServiceSectionInput>("services");
+  const [activeSection, setActiveSection] = useState<ServiceSectionInput>("pricing");
   const [editingItem, setEditingItem] = useState<ServiceItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ServiceItem | null>(null);
+  const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
+  const [categoryDeleteTarget, setCategoryDeleteTarget] = useState<ServiceCategory | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -2207,11 +2198,7 @@ function AdminServices({
     status: "active" as "active" | "draft",
     displayOrder: "0",
     itemId: "",
-    icon: "FileCheck2",
     gradient: "gradient-teal-purple",
-    cta: "",
-    bookingService: "",
-    badge: "",
     category: "Resources",
     unit: "",
     priceLabel: "",
@@ -2222,15 +2209,24 @@ function AdminServices({
     tagline: "",
     popular: false,
     features: "",
+    includedPackageIds: [] as string[],
     metadata: "{}",
   });
+  const [categoryForm, setCategoryForm] = useState({
+    name: "",
+    displayOrder: "0",
+    pricingNote: "",
+    builderNote: "",
+  });
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
-  const isServicesSection = activeSection === "services";
   const isPricingLikeSection =
     activeSection === "pricing" || activeSection === "build-your-package";
   const isPackagesSection = activeSection === "packages";
+  const isPackageComparisonSection = activeSection === "package-comparison";
 
   const parseMetadata = (metadataJson: string) =>
     JSON.parse(metadataJson.trim() || "{}") as Record<string, unknown>;
@@ -2240,6 +2236,19 @@ function AdminServices({
 
   const booleanMetadata = (metadata: Record<string, unknown>, key: string) =>
     metadata[key] === true;
+
+  const categoryOptions = serviceData?.categories.map((category) => category.name) ?? [];
+  const selectCategoryOptions = categoryOptions.includes(form.category)
+    ? categoryOptions
+    : [...categoryOptions, form.category].filter(Boolean);
+  const defaultCategory = activeSection === "build-your-package" ? "Packages" : "Resources";
+  const packageOptions =
+    serviceData?.items
+      .filter((item) => item.section === "packages")
+      .map((item) => ({
+        id: stringMetadata(item.metadata, "itemId", item.contentKey ?? item.id),
+        name: item.title,
+      })) ?? [];
 
   const metadataFromForm = () => {
     const metadata = parseMetadata(form.metadata);
@@ -2259,14 +2268,6 @@ function AdminServices({
     };
 
     setString("itemId", form.itemId);
-
-    if (isServicesSection) {
-      setString("icon", form.icon);
-      setString("gradient", form.gradient);
-      setString("cta", form.cta);
-      setString("bookingService", form.bookingService);
-      setString("badge", form.badge);
-    }
 
     if (isPricingLikeSection) {
       setString("category", form.category);
@@ -2293,6 +2294,14 @@ function AdminServices({
       }
     }
 
+    if (isPackageComparisonSection) {
+      if (form.includedPackageIds.length > 0) {
+        metadata.includedPackageIds = form.includedPackageIds;
+      } else {
+        delete metadata.includedPackageIds;
+      }
+    }
+
     return metadata;
   };
 
@@ -2305,12 +2314,10 @@ function AdminServices({
       status: "active",
       displayOrder: "0",
       itemId: "",
-      icon: "FileCheck2",
       gradient: "gradient-teal-purple",
-      cta: "",
-      bookingService: "",
-      badge: "",
-      category: activeSection === "build-your-package" ? "Packages" : "Resources",
+      category: categoryOptions.includes(defaultCategory)
+        ? defaultCategory
+        : (categoryOptions[0] ?? defaultCategory),
       unit: "",
       priceLabel: "",
       allowQuantity: false,
@@ -2320,9 +2327,36 @@ function AdminServices({
       tagline: "",
       popular: false,
       features: "",
+      includedPackageIds: [],
       metadata: JSON.stringify({ route: `/${activeSection}` }, null, 2),
     });
     setModalOpen(true);
+  };
+
+  const openCreateCategory = () => {
+    setEditingCategory(null);
+    const maxOrder = Math.max(
+      0,
+      ...(serviceData?.categories.map((category) => category.displayOrder) ?? []),
+    );
+    setCategoryForm({
+      name: "",
+      displayOrder: String(maxOrder + 10),
+      pricingNote: "",
+      builderNote: "",
+    });
+    setCategoryModalOpen(true);
+  };
+
+  const openEditCategory = (category: ServiceCategory) => {
+    setEditingCategory(category);
+    setCategoryForm({
+      name: category.name,
+      displayOrder: String(category.displayOrder),
+      pricingNote: category.pricingNote,
+      builderNote: category.builderNote,
+    });
+    setCategoryModalOpen(true);
   };
 
   const openEdit = (item: ServiceItem) => {
@@ -2335,11 +2369,7 @@ function AdminServices({
       status: item.status,
       displayOrder: String(item.displayOrder),
       itemId: stringMetadata(metadata, "itemId", item.contentKey ?? ""),
-      icon: stringMetadata(metadata, "icon", "FileCheck2"),
       gradient: stringMetadata(metadata, "gradient", "gradient-teal-purple"),
-      cta: stringMetadata(metadata, "cta"),
-      bookingService: stringMetadata(metadata, "bookingService"),
-      badge: stringMetadata(metadata, "badge"),
       category: stringMetadata(metadata, "category", "Resources"),
       unit: stringMetadata(metadata, "unit"),
       priceLabel: stringMetadata(metadata, "priceLabel"),
@@ -2352,6 +2382,9 @@ function AdminServices({
       features: Array.isArray(metadata.features)
         ? metadata.features.filter((feature) => typeof feature === "string").join("\n")
         : "",
+      includedPackageIds: Array.isArray(metadata.includedPackageIds)
+        ? metadata.includedPackageIds.filter((packageId) => typeof packageId === "string")
+        : [],
       metadata: item.metadataJson,
     });
     setModalOpen(true);
@@ -2370,7 +2403,7 @@ function AdminServices({
 
     const payload = {
       title: form.title,
-      description: form.description,
+      description: isPackagesSection ? form.tagline : form.description,
       price: form.price.trim() ? Number(form.price) : null,
       status: form.status,
       displayOrder: Number(form.displayOrder || 0),
@@ -2413,7 +2446,60 @@ function AdminServices({
     }
   };
 
+  const onSubmitCategory = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    const payload = {
+      name: categoryForm.name,
+      displayOrder: Number(categoryForm.displayOrder || 0),
+      pricingNote: categoryForm.pricingNote,
+      builderNote: categoryForm.builderNote,
+    };
+
+    try {
+      setIsSavingCategory(true);
+      if (editingCategory) {
+        await updateAdminServiceCategory({ data: { id: editingCategory.id, ...payload } });
+        toast.success("Category updated across content.");
+      } else {
+        await createAdminServiceCategory({ data: payload });
+        toast.success("Category created.");
+      }
+      setCategoryModalOpen(false);
+      await onRefresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Category could not be saved.");
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const onDeleteCategory = async () => {
+    if (!categoryDeleteTarget) {
+      return;
+    }
+
+    try {
+      setDeletingCategoryId(categoryDeleteTarget.id);
+      await deleteAdminServiceCategory({ data: { id: categoryDeleteTarget.id } });
+      toast.success("Category deleted.");
+      setCategoryDeleteTarget(null);
+      await onRefresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Category could not be deleted.");
+    } finally {
+      setDeletingCategoryId(null);
+    }
+  };
+
   const activeItems = serviceData?.items.filter((item) => item.section === activeSection) ?? [];
+  const categoryDeleteUsageCount = categoryDeleteTarget
+    ? (serviceData?.items.filter(
+        (item) =>
+          (item.section === "pricing" || item.section === "build-your-package") &&
+          stringMetadata(item.metadata, "category") === categoryDeleteTarget.name,
+      ).length ?? 0)
+    : 0;
 
   return (
     <div className="space-y-5">
@@ -2452,7 +2538,7 @@ function AdminServices({
           <div>
             <CardTitle>Editable route content</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Manage content shown for services, pricing, package builder and packages.
+              Manage content shown for pricing, package builder, packages and package comparison.
             </p>
           </div>
           <Button className="rounded-full gradient-purple-orange text-white" onClick={openCreate}>
@@ -2478,11 +2564,79 @@ function AdminServices({
             ))}
           </div>
 
+          {isPricingLikeSection && (
+            <div className="mb-5 rounded-2xl border border-border bg-muted/20 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-semibold">Pricing categories</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Rename a category here to update every service assigned to it.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={openCreateCategory}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add category
+                </Button>
+              </div>
+              <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {serviceData?.categories.map((category) => {
+                  const usageCount = serviceData.items.filter(
+                    (item) =>
+                      (item.section === "pricing" || item.section === "build-your-package") &&
+                      stringMetadata(item.metadata, "category") === category.name,
+                  ).length;
+
+                  return (
+                    <div
+                      key={category.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">{category.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {usageCount} items - order {category.displayOrder}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 rounded-full p-0"
+                          onClick={() => openEditCategory(category)}
+                          aria-label={`Edit ${category.name}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 rounded-full p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          disabled={deletingCategoryId === category.id}
+                          onClick={() => setCategoryDeleteTarget(category)}
+                          aria-label={`Delete ${category.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
-                <TableHead>Price</TableHead>
+                {isPricingLikeSection ? <TableHead>Category</TableHead> : null}
+                {isPackageComparisonSection ? <TableHead>Included packages</TableHead> : null}
+                {!isPackageComparisonSection ? <TableHead>Price</TableHead> : null}
                 <TableHead>Status</TableHead>
                 <TableHead>Order</TableHead>
                 <TableHead className="text-right">Action</TableHead>
@@ -2497,7 +2651,19 @@ function AdminServices({
                       {item.description}
                     </div>
                   </TableCell>
-                  <TableCell>{item.price == null ? "-" : `£${item.price}`}</TableCell>
+                  {isPricingLikeSection ? (
+                    <TableCell>{stringMetadata(item.metadata, "category") || "-"}</TableCell>
+                  ) : null}
+                  {isPackageComparisonSection ? (
+                    <TableCell>
+                      {Array.isArray(item.metadata.includedPackageIds)
+                        ? item.metadata.includedPackageIds.length
+                        : 0}
+                    </TableCell>
+                  ) : null}
+                  {!isPackageComparisonSection ? (
+                    <TableCell>{item.price == null ? "-" : `GBP ${item.price}`}</TableCell>
+                  ) : null}
                   <TableCell>
                     <Badge variant="outline" className="rounded-full capitalize">
                       {item.status}
@@ -2553,15 +2719,17 @@ function AdminServices({
                 required
               />
             </div>
-            <div>
-              <Label htmlFor="service-description">Description</Label>
-              <textarea
-                id="service-description"
-                className="mt-1 min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={form.description}
-                onChange={(event) => setForm({ ...form, description: event.target.value })}
-              />
-            </div>
+            {!isPackagesSection && (
+              <div>
+                <Label htmlFor="service-description">Description</Label>
+                <textarea
+                  id="service-description"
+                  className="mt-1 min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.description}
+                  onChange={(event) => setForm({ ...form, description: event.target.value })}
+                />
+              </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <Label htmlFor="service-price">Price</Label>
@@ -2614,78 +2782,6 @@ function AdminServices({
                 Stable internal name used by links and package selections.
               </p>
             </div>
-            {isServicesSection && (
-              <div className="rounded-2xl border border-border bg-muted/20 p-4">
-                <div>
-                  <h4 className="font-semibold">Service display settings</h4>
-                  <p className="text-xs text-muted-foreground">
-                    Controls how this service card appears on the public services page.
-                  </p>
-                </div>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="service-icon">Icon</Label>
-                    <select
-                      id="service-icon"
-                      className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      value={form.icon}
-                      onChange={(event) => setForm({ ...form, icon: event.target.value })}
-                    >
-                      {SERVICE_ICON_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="service-gradient">Color style</Label>
-                    <select
-                      id="service-gradient"
-                      className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      value={form.gradient}
-                      onChange={(event) => setForm({ ...form, gradient: event.target.value })}
-                    >
-                      {GRADIENT_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="service-cta">Button text</Label>
-                    <Input
-                      id="service-cta"
-                      className="mt-1"
-                      placeholder="Example: Enquire about due diligence"
-                      value={form.cta}
-                      onChange={(event) => setForm({ ...form, cta: event.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="service-booking">Booking option</Label>
-                    <Input
-                      id="service-booking"
-                      className="mt-1"
-                      placeholder="Example: due-diligence"
-                      value={form.bookingService}
-                      onChange={(event) => setForm({ ...form, bookingService: event.target.value })}
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="service-badge">Badge</Label>
-                    <Input
-                      id="service-badge"
-                      className="mt-1"
-                      placeholder="Example: Fully managed subscription"
-                      value={form.badge}
-                      onChange={(event) => setForm({ ...form, badge: event.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
             {isPricingLikeSection && (
               <div className="rounded-2xl border border-border bg-muted/20 p-4">
                 <div>
@@ -2703,7 +2799,7 @@ function AdminServices({
                       value={form.category}
                       onChange={(event) => setForm({ ...form, category: event.target.value })}
                     >
-                      {PRICING_CATEGORY_OPTIONS.map((category) => (
+                      {selectCategoryOptions.map((category) => (
                         <option key={category} value={category}>
                           {category}
                         </option>
@@ -2831,6 +2927,37 @@ function AdminServices({
                 </div>
               </div>
             )}
+            {isPackageComparisonSection && (
+              <div className="rounded-2xl border border-border bg-muted/20 p-4">
+                <div>
+                  <h4 className="font-semibold">Comparison row settings</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Choose which package cards include this comparison feature.
+                  </p>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {packageOptions.map((pkg) => (
+                    <label
+                      key={pkg.id}
+                      className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-magenta"
+                        checked={form.includedPackageIds.includes(pkg.id)}
+                        onChange={(event) => {
+                          const next = event.target.checked
+                            ? [...form.includedPackageIds, pkg.id]
+                            : form.includedPackageIds.filter((packageId) => packageId !== pkg.id);
+                          setForm({ ...form, includedPackageIds: next });
+                        }}
+                      />
+                      {pkg.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <details className="rounded-2xl border border-dashed border-border bg-background p-4">
               <summary className="cursor-pointer text-sm font-semibold">
                 Advanced metadata JSON
@@ -2857,9 +2984,74 @@ function AdminServices({
         </DialogContent>
       </Dialog>
 
+      <Dialog open={categoryModalOpen} onOpenChange={setCategoryModalOpen}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingCategory ? "Edit category" : "Create category"}</DialogTitle>
+            <DialogDescription>
+              Category names appear on pricing and package builder pages.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onSubmitCategory} className="space-y-4">
+            <div>
+              <Label htmlFor="category-name">Name</Label>
+              <Input
+                id="category-name"
+                className="mt-1"
+                value={categoryForm.name}
+                onChange={(event) => setCategoryForm({ ...categoryForm, name: event.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="category-order">Display order</Label>
+              <Input
+                id="category-order"
+                type="number"
+                min="0"
+                className="mt-1"
+                value={categoryForm.displayOrder}
+                onChange={(event) =>
+                  setCategoryForm({ ...categoryForm, displayOrder: event.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label htmlFor="category-pricing-note">Pricing page subheading</Label>
+              <textarea
+                id="category-pricing-note"
+                className="mt-1 min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={categoryForm.pricingNote}
+                onChange={(event) =>
+                  setCategoryForm({ ...categoryForm, pricingNote: event.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label htmlFor="category-builder-note">Package builder subheading</Label>
+              <textarea
+                id="category-builder-note"
+                className="mt-1 min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={categoryForm.builderNote}
+                onChange={(event) =>
+                  setCategoryForm({ ...categoryForm, builderNote: event.target.value })
+                }
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={isSavingCategory}
+              className="w-full rounded-full gradient-purple-orange text-white"
+            >
+              {isSavingCategory ? "Saving..." : "Save category"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <SharedDeleteDialog
         open={Boolean(deleteTarget)}
-        title="Delete service content?"
+        title="Delete content item?"
         itemName={deleteTarget?.title ?? ""}
         isDeleting={Boolean(deleteTarget && deletingId === deleteTarget.id)}
         onOpenChange={(open) => {
@@ -2872,6 +3064,26 @@ function AdminServices({
         }}
         onConfirm={() => void onDelete()}
       />
+      <SharedDeleteDialog
+        open={Boolean(categoryDeleteTarget)}
+        title="Delete category?"
+        itemName={categoryDeleteTarget?.name ?? ""}
+        description={
+          categoryDeleteUsageCount > 0
+            ? `This will permanently delete "${categoryDeleteTarget?.name}" and move ${categoryDeleteUsageCount} assigned item${categoryDeleteUsageCount === 1 ? "" : "s"} to Uncategorized. This action cannot be undone.`
+            : undefined
+        }
+        isDeleting={Boolean(categoryDeleteTarget && deletingCategoryId === categoryDeleteTarget.id)}
+        onOpenChange={(open) => {
+          if (deletingCategoryId) {
+            return;
+          }
+          if (!open) {
+            setCategoryDeleteTarget(null);
+          }
+        }}
+        onConfirm={() => void onDeleteCategory()}
+      />
     </div>
   );
 }
@@ -2880,6 +3092,7 @@ function SharedDeleteDialog({
   open,
   title,
   itemName,
+  description,
   isDeleting,
   onOpenChange,
   onConfirm,
@@ -2887,6 +3100,7 @@ function SharedDeleteDialog({
   open: boolean;
   title: string;
   itemName: string;
+  description?: string;
   isDeleting: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
@@ -2897,8 +3111,10 @@ function SharedDeleteDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete {itemName ? `"${itemName}"` : "this item"} from the
-            database. This action cannot be undone.
+            {description ??
+              `This will permanently delete ${
+                itemName ? `"${itemName}"` : "this item"
+              } from the database. This action cannot be undone.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

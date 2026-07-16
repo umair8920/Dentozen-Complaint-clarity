@@ -3,7 +3,12 @@ import { z } from "zod";
 
 const roleSchema = z.enum(["admin", "trainer", "user"]);
 const statusSchema = z.enum(["active", "inactive"]);
-const serviceSectionSchema = z.enum(["services", "pricing", "build-your-package", "packages"]);
+const serviceSectionSchema = z.enum([
+  "pricing",
+  "build-your-package",
+  "packages",
+  "package-comparison",
+]);
 const serviceItemStatusSchema = z.enum(["active", "draft"]);
 
 export const adminUsersQuerySchema = z.object({
@@ -54,6 +59,21 @@ export const updateServiceItemSchema = serviceItemSchema.omit({ section: true })
 });
 
 export const deleteServiceItemSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export const serviceCategorySchema = z.object({
+  name: z.string().trim().min(1, "Category name is required.").max(120),
+  displayOrder: z.number().int().min(0).default(0),
+  pricingNote: z.string().trim().max(500).optional().or(z.literal("")),
+  builderNote: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
+export const updateServiceCategorySchema = serviceCategorySchema.extend({
+  id: z.string().uuid(),
+});
+
+export const deleteServiceCategorySchema = z.object({
   id: z.string().uuid(),
 });
 
@@ -125,4 +145,25 @@ export const deleteAdminServiceItem = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { AdminController } = await import("../../../server/controllers/admin.controller");
     return AdminController.deleteServiceItem(data);
+  });
+
+export const createAdminServiceCategory = createServerFn({ method: "POST" })
+  .validator(serviceCategorySchema)
+  .handler(async ({ data }) => {
+    const { AdminController } = await import("../../../server/controllers/admin.controller");
+    return AdminController.createServiceCategory(data);
+  });
+
+export const updateAdminServiceCategory = createServerFn({ method: "POST" })
+  .validator(updateServiceCategorySchema)
+  .handler(async ({ data }) => {
+    const { AdminController } = await import("../../../server/controllers/admin.controller");
+    return AdminController.updateServiceCategory(data);
+  });
+
+export const deleteAdminServiceCategory = createServerFn({ method: "POST" })
+  .validator(deleteServiceCategorySchema)
+  .handler(async ({ data }) => {
+    const { AdminController } = await import("../../../server/controllers/admin.controller");
+    return AdminController.deleteServiceCategory(data);
   });

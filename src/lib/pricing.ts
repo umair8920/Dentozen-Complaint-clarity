@@ -16,13 +16,16 @@ export type PriceItem = {
   tiered?: boolean;
 };
 
-export type Category =
-  | "Packages"
-  | "Risk Assessments"
-  | "Training"
-  | "Direct 365 Services"
-  | "RPA"
-  | "Resources";
+export type Category = string;
+
+export const DEFAULT_CATEGORIES: Category[] = [
+  "Packages",
+  "Risk Assessments",
+  "Training",
+  "Direct 365 Services",
+  "RPA",
+  "Resources",
+];
 
 export const PACKAGES = [
   {

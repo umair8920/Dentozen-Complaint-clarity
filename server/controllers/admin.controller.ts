@@ -68,14 +68,14 @@ export const AdminController = {
   },
 
   async serviceItems(input: {
-    section?: "services" | "pricing" | "build-your-package" | "packages";
+    section?: "pricing" | "build-your-package" | "packages" | "package-comparison";
   }) {
     await requireAdmin();
     return ServiceContentService.list(input.section);
   },
 
   async createServiceItem(input: {
-    section: "services" | "pricing" | "build-your-package" | "packages";
+    section: "pricing" | "build-your-package" | "packages" | "package-comparison";
     title: string;
     description?: string;
     price?: number | null;
@@ -104,5 +104,32 @@ export const AdminController = {
   async deleteServiceItem(input: { id: string }) {
     await requireAdmin();
     return { item: await ServiceContentService.delete(input.id) };
+  },
+
+  async createServiceCategory(input: {
+    name: string;
+    displayOrder?: number;
+    pricingNote?: string;
+    builderNote?: string;
+  }) {
+    await requireAdmin();
+    return { category: await ServiceContentService.createCategory(input) };
+  },
+
+  async updateServiceCategory(input: {
+    id: string;
+    name: string;
+    displayOrder?: number;
+    pricingNote?: string;
+    builderNote?: string;
+  }) {
+    await requireAdmin();
+    const { id, ...data } = input;
+    return { category: await ServiceContentService.updateCategory(id, data) };
+  },
+
+  async deleteServiceCategory(input: { id: string }) {
+    await requireAdmin();
+    return { category: await ServiceContentService.deleteCategory(input.id) };
   },
 };

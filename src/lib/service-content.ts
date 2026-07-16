@@ -1,4 +1,12 @@
-import { ITEMS, PACKAGES, type Category, type PriceItem, type Unit } from "@/lib/pricing";
+import {
+  COMPARISON_ROWS,
+  DEFAULT_CATEGORIES,
+  ITEMS,
+  PACKAGES,
+  type Category,
+  type PriceItem,
+  type Unit,
+} from "@/lib/pricing";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type Metadata = { [key: string]: JsonValue };
@@ -6,7 +14,7 @@ type Metadata = { [key: string]: JsonValue };
 export type PublicServiceContentItem = {
   id: string;
   contentKey: string | null;
-  section: "services" | "pricing" | "build-your-package" | "packages";
+  section: "pricing" | "build-your-package" | "packages" | "package-comparison";
   title: string;
   description: string;
   price: number | null;
@@ -15,15 +23,12 @@ export type PublicServiceContentItem = {
   metadata?: Metadata;
 };
 
-export type ServiceCardContent = {
+export type PublicServiceCategory = {
   id: string;
-  icon: string;
-  gradient: string;
-  title: string;
-  body: string;
-  cta: string;
-  bookingService: string;
-  badge?: string;
+  name: string;
+  displayOrder: number;
+  pricingNote: string;
+  builderNote: string;
 };
 
 export type PackageCardContent = {
@@ -36,14 +41,11 @@ export type PackageCardContent = {
   popular: boolean;
 };
 
-const CATEGORIES: Category[] = [
-  "Packages",
-  "Risk Assessments",
-  "Training",
-  "Direct 365 Services",
-  "RPA",
-  "Resources",
-];
+export type PackageComparisonRow = {
+  id: string;
+  label: string;
+  includedPackageIds: string[];
+};
 
 const UNITS: Unit[] = ["each", "month", "year", "item", "service"];
 
@@ -64,28 +66,28 @@ function itemId(item: PublicServiceContentItem) {
 }
 
 function categoryValue(value: unknown): Category {
-  return CATEGORIES.includes(value as Category) ? (value as Category) : "Resources";
+  return typeof value === "string" && value.trim() ? value : "Resources";
 }
 
 function unitValue(value: unknown): Unit | undefined {
   return UNITS.includes(value as Unit) ? (value as Unit) : undefined;
 }
 
-export function toServiceCards(items: PublicServiceContentItem[]): ServiceCardContent[] {
-  if (items.length === 0) {
-    return [];
-  }
+export function categoryNames(
+  categories: PublicServiceCategory[] | undefined,
+  items: PriceItem[],
+  includePackages = false,
+): Category[] {
+  const fromRecords = (categories ?? []).map((category) => category.name).filter(Boolean);
+  const fromItems = items.map((item) => item.category).filter(Boolean);
+  const ordered = [...fromRecords, ...DEFAULT_CATEGORIES, ...fromItems];
+  const unique = ordered.filter((category, index) => ordered.indexOf(category) === index);
 
-  return items.map((item) => ({
-    id: itemId(item),
-    icon: stringValue(item.metadata?.icon, "FileCheck2"),
-    gradient: stringValue(item.metadata?.gradient, "gradient-teal-purple"),
-    title: item.title,
-    body: item.description,
-    cta: stringValue(item.metadata?.cta, "Book this service"),
-    bookingService: stringValue(item.metadata?.bookingService, "other"),
-    badge: stringValue(item.metadata?.badge) || undefined,
-  }));
+  return unique.filter(
+    (category) =>
+      (includePackages || category !== "Packages") &&
+      items.some((item) => item.category === category),
+  );
 }
 
 export function toPriceItems(
@@ -132,4 +134,27 @@ export function toPackageCards(items: PublicServiceContentItem[]): PackageCardCo
       popular: booleanValue(item.metadata?.popular),
     };
   });
+}
+
+export function toPackageComparisonRows(
+  items: PublicServiceContentItem[],
+  packageIds: string[],
+): PackageComparisonRow[] {
+  if (items.length === 0) {
+    return COMPARISON_ROWS.map((row, rowIndex) => ({
+      id: `comparison-${rowIndex}`,
+      label: row.label,
+      includedPackageIds: packageIds.filter((_, packageIndex) => row.pkgs[packageIndex]),
+    }));
+  }
+
+  return items.map((item) => ({
+    id: itemId(item),
+    label: item.title,
+    includedPackageIds: Array.isArray(item.metadata?.includedPackageIds)
+      ? item.metadata.includedPackageIds.filter(
+          (packageId): packageId is string => typeof packageId === "string",
+        )
+      : [],
+  }));
 }

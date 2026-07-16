@@ -3,9 +3,9 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { SectionHeading } from "@/components/SectionHeading";
 import { CTASection } from "@/components/CTASection";
 import { Button } from "@/components/ui/button";
-import { ITEMS, formatGBP, type Category } from "@/lib/pricing";
+import { ITEMS, formatGBP } from "@/lib/pricing";
 import { getPublicServiceItems } from "@/lib/api/service-content.functions";
-import { toPriceItems } from "@/lib/service-content";
+import { categoryNames, toPriceItems } from "@/lib/service-content";
 import { encodeSelection } from "@/lib/package-selection";
 
 export const Route = createFileRoute("/pricing")({
@@ -27,20 +27,13 @@ export const Route = createFileRoute("/pricing")({
   component: PricingPage,
 });
 
-const CATEGORIES: Category[] = [
-  "Risk Assessments",
-  "Training",
-  "Direct 365 Services",
-  "RPA",
-  "Resources",
-];
-
 function PricingPage() {
-  const { items } = Route.useLoaderData();
+  const { items, categories } = Route.useLoaderData();
   const priceItems = toPriceItems(
     items,
     ITEMS.filter((item) => item.category !== "Packages"),
   );
+  const visibleCategories = categoryNames(categories, priceItems);
 
   return (
     <SiteLayout>
@@ -49,13 +42,13 @@ function PricingPage() {
           <SectionHeading
             eyebrow="Pricing"
             title="Pick and choose — or mix them all"
-            description="Every service we offer, with transparent pricing. Mix and match any of these in our Build Your Package tool."
+            description="Every service we offer, with transparent pricing. Mix and match any of these in our Build Your own Package tool."
             center
           />
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Button asChild className="rounded-full gradient-purple-orange text-white">
               <Link to="/build-your-package" search={{ selection: undefined }}>
-                Build Your Package
+                Build Your own Package
               </Link>
             </Button>
             <Button asChild variant="outline" className="rounded-full border-2">
@@ -67,8 +60,15 @@ function PricingPage() {
 
       <section className="px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl space-y-10">
-          {CATEGORIES.map((cat) => {
+          {visibleCategories.map((cat) => {
             const items = priceItems.filter((i) => i.category === cat);
+            const category = categories.find((item) => item.name === cat);
+            const hasVatOrTieredPricing = items.some((item) => item.exVat || item.tiered);
+            const categoryNote =
+              category?.pricingNote ||
+              (hasVatOrTieredPricing
+                ? "All prices shown ex-VAT. PAT uses tiered pricing: £1.88/item up to 40, then £0.80/item."
+                : "");
             return (
               <div
                 key={cat}
@@ -77,12 +77,7 @@ function PricingPage() {
               >
                 <div className="gradient-teal-purple px-6 py-4 text-white">
                   <h2 className="text-xl font-bold">{cat}</h2>
-                  {cat === "Direct 365 Services" && (
-                    <p className="text-xs text-white/90">
-                      All prices shown ex-VAT. PAT uses tiered pricing: £1.88/item up to 40, then
-                      £0.80/item.
-                    </p>
-                  )}
+                  {categoryNote ? <p className="text-xs text-white/90">{categoryNote}</p> : null}
                 </div>
                 <ul className="divide-y divide-border">
                   {items.map((it) => (

@@ -55,7 +55,8 @@ function escapeHtml(value: string) {
 async function getPackagePriceItems() {
   try {
     const { ServiceContentService } = await import("../../server/services/service-content.service");
-    return toPriceItems(await ServiceContentService.listPublic("build-your-package"), ITEMS);
+    const { items } = await ServiceContentService.listPublic("build-your-package");
+    return toPriceItems(items, ITEMS);
   } catch (error) {
     console.error("Falling back to static package pricing for email summary.", error);
     return ITEMS;

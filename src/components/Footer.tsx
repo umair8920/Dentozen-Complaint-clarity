@@ -34,10 +34,9 @@ export function Footer() {
           <ul className="mt-4 space-y-2 text-sm">
             {[
               ["/packages", "Packages"],
-              ["/services", "Services"],
               ["/squat-practices", "Squat Practices"],
               ["/pricing", "Pricing"],
-              ["/build-your-package", "Build Your Package"],
+              ["/build-your-package", "Build Your own Package"],
             ].map(([to, label]) => (
               <li key={to}>
                 <Link to={to} className="text-muted-foreground hover:text-foreground">
@@ -52,7 +51,6 @@ export function Footer() {
           <h4 className="text-sm font-semibold text-foreground">Company</h4>
           <ul className="mt-4 space-y-2 text-sm">
             {[
-              ["/about", "About"],
               ["/resources", "Resources"],
               ["/contact", "Contact"],
               ["/book", "Book Now"],

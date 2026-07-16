@@ -3,9 +3,8 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { SectionHeading } from "@/components/SectionHeading";
 import { CTASection } from "@/components/CTASection";
 import { Button } from "@/components/ui/button";
-import { COMPARISON_ROWS } from "@/lib/pricing";
 import { getPublicServiceItems } from "@/lib/api/service-content.functions";
-import { toPackageCards } from "@/lib/service-content";
+import { toPackageCards, toPackageComparisonRows } from "@/lib/service-content";
 import { Check, X } from "lucide-react";
 
 export const Route = createFileRoute("/packages")({
@@ -26,13 +25,24 @@ export const Route = createFileRoute("/packages")({
     ],
     links: [{ rel: "canonical", href: "/packages" }],
   }),
-  loader: async () => getPublicServiceItems({ data: { section: "packages" } }),
+  loader: async () => {
+    const [packages, comparison] = await Promise.all([
+      getPublicServiceItems({ data: { section: "packages" } }),
+      getPublicServiceItems({ data: { section: "package-comparison" } }),
+    ]);
+
+    return { packages: packages.items, comparison: comparison.items };
+  },
   component: PackagesPage,
 });
 
 function PackagesPage() {
-  const { items } = Route.useLoaderData();
-  const packages = toPackageCards(items);
+  const { packages: packageItems, comparison } = Route.useLoaderData();
+  const packages = toPackageCards(packageItems);
+  const comparisonRows = toPackageComparisonRows(
+    comparison,
+    packages.map((item) => item.id),
+  );
 
   return (
     <SiteLayout>
@@ -104,12 +114,12 @@ function PackagesPage() {
                 </tr>
               </thead>
               <tbody>
-                {COMPARISON_ROWS.map((row) => (
+                {comparisonRows.map((row) => (
                   <tr key={row.label} className="border-t border-border">
                     <td className="px-6 py-4">{row.label}</td>
-                    {row.pkgs.map((v, i) => (
-                      <td key={i} className="px-6 py-4 text-center">
-                        {v ? (
+                    {packages.map((pkg) => (
+                      <td key={pkg.id} className="px-6 py-4 text-center">
+                        {row.includedPackageIds.includes(pkg.id) ? (
                           <Check className="mx-auto h-5 w-5 text-teal" />
                         ) : (
                           <X className="mx-auto h-5 w-5 text-muted-foreground/40" />

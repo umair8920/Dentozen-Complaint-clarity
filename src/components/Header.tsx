@@ -9,12 +9,10 @@ import { getCurrentUser, logout } from "@/lib/api/auth.functions";
 const NAV = [
   { to: "/", label: "Home" },
   { to: "/packages", label: "Packages" },
-  { to: "/services", label: "Services" },
   { to: "/squat-practices", label: "Squat Practices" },
   { to: "/pricing", label: "Pricing" },
-  { to: "/build-your-package", label: "Build Your Package" },
+  { to: "/build-your-package", label: "Build Your own Package" },
   { to: "/resources", label: "Resources" },
-  { to: "/about", label: "About" },
   { to: "/contact", label: "Contact" },
 ] as const;
 
@@ -23,13 +21,11 @@ const DESKTOP_NAV = [
   { to: "/packages", label: "Packages" },
   { to: "/squat-practices", label: "Squat Practices" },
   { to: "/resources", label: "Resources" },
-  { to: "/about", label: "About" },
   { to: "/contact", label: "Contact" },
 ] as const;
 
 const PRICING_MENU = [
-  { to: "/services", label: "Services" },
-  { to: "/build-your-package", label: "Build Your Package" },
+  { to: "/build-your-package", label: "Build Your own Package" },
 ] as const;
 
 const desktopLinkClass =
@@ -128,7 +124,7 @@ export function Header() {
         <div className="hidden items-center gap-2 lg:flex">
           <Button asChild variant="outline" className="rounded-full border-2">
             <Link to="/build-your-package" search={{ selection: undefined }}>
-              Build Your Package
+              Build Your own Package
             </Link>
           </Button>
           <Button

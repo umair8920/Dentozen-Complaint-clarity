@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ITEMS, formatGBP, type Category } from "@/lib/pricing";
 import { getPublicServiceItems } from "@/lib/api/service-content.functions";
-import { toPriceItems } from "@/lib/service-content";
+import { categoryNames, toPriceItems } from "@/lib/service-content";
 import {
   decodeSelection,
   encodeSelection,
@@ -24,13 +24,13 @@ export const Route = createFileRoute("/build-your-package")({
   }),
   head: () => ({
     meta: [
-      { title: "Build Your Package - Live Compliance Calculator - SDC&T" },
+      { title: "Build Your own Package - Live Compliance Calculator - SDC&T" },
       {
         name: "description",
         content:
           "Build a bespoke compliance package for your dental practice and see the price live. Email yourself a quote or book and pay.",
       },
-      { property: "og:title", content: "Build Your Package - SDC&T" },
+      { property: "og:title", content: "Build Your own Package - SDC&T" },
       {
         property: "og:description",
         content: "Interactive dental compliance calculator with live pricing.",
@@ -43,19 +43,11 @@ export const Route = createFileRoute("/build-your-package")({
   component: BuilderPage,
 });
 
-const CATEGORIES: Category[] = [
-  "Packages",
-  "Risk Assessments",
-  "Training",
-  "Direct 365 Services",
-  "RPA",
-  "Resources",
-];
-
 function BuilderPage() {
   const search = Route.useSearch();
-  const { items } = Route.useLoaderData();
+  const { items, categories } = Route.useLoaderData();
   const priceItems = toPriceItems(items, ITEMS);
+  const visibleCategories = categoryNames(categories, priceItems, true);
   const [sel, setSel] = useState<PackageSelection>(() => decodeSelection(search.selection));
   const [openCats, setOpenCats] = useState<Record<Category, boolean>>({
     Packages: true,
@@ -172,12 +164,13 @@ function BuilderPage() {
                   onChange={(e) => setVatInclusive(e.target.checked)}
                   className="h-4 w-4 accent-magenta"
                 />
-                Show VAT-inclusive total (Direct 365 items are +VAT)
+                Show VAT-inclusive total for items marked +VAT
               </Label>
             </div>
 
-            {CATEGORIES.map((cat) => {
+            {visibleCategories.map((cat) => {
               const items = priceItems.filter((i) => i.category === cat);
+              const category = categories.find((item) => item.name === cat);
               const open = openCats[cat];
 
               return (
@@ -189,7 +182,14 @@ function BuilderPage() {
                     onClick={() => setOpenCats((s) => ({ ...s, [cat]: !s[cat] }))}
                     className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left"
                   >
-                    <h2 className="text-lg font-bold">{cat}</h2>
+                    <span>
+                      <h2 className="text-lg font-bold">{cat}</h2>
+                      {category?.builderNote ? (
+                        <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                          {category.builderNote}
+                        </span>
+                      ) : null}
+                    </span>
                     <ChevronDown
                       className={`h-5 w-5 transition-transform ${open ? "rotate-180" : ""}`}
                     />
@@ -283,7 +283,7 @@ function BuilderPage() {
                 <div className="text-xs text-white/80">
                   {vatInclusive
                     ? "VAT inclusive where applicable"
-                    : "Ex-VAT - VAT applies to Direct 365 items"}
+                    : "Ex-VAT - VAT applies to items marked +VAT"}
                 </div>
               </div>
               <div className="max-h-80 overflow-y-auto p-4">

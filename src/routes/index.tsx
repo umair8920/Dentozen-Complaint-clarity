@@ -52,19 +52,19 @@ const SERVICES = [
     icon: ClipboardCheck,
     title: "CQC Mock Inspections",
     desc: "Full pre-inspection review with detailed report and action-plan support.",
-    to: "/services",
+    to: "/pricing",
   },
   {
     icon: Building2,
     title: "Due Diligence",
     desc: "Compliance review before you buy a practice — know exactly what you're getting.",
-    to: "/services",
+    to: "/pricing",
   },
   {
     icon: Sparkles,
     title: "Smart Managed Service",
     desc: "We manage your compliance entirely. Quarterly visits, one provider, zero stress.",
-    to: "/services",
+    to: "/packages",
   },
   {
     icon: Stethoscope,
@@ -76,7 +76,7 @@ const SERVICES = [
     icon: FileCheck2,
     title: "CQC Registration",
     desc: "Standalone CQC registration support for new and changing practices.",
-    to: "/services",
+    to: "/pricing",
   },
   {
     icon: GraduationCap,
@@ -113,7 +113,7 @@ function HomePage() {
                   className="rounded-full bg-white text-magenta hover:bg-white/90"
                 >
                   <Link to="/build-your-package" search={{ selection: undefined }}>
-                    <Calculator className="mr-2 h-4 w-4" /> Build Your Package
+                    <Calculator className="mr-2 h-4 w-4" /> Build Your own Package
                   </Link>
                 </Button>
                 <Button
