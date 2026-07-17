@@ -1,6 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Check, ChevronDown, Mail, Minus, Plus, Sparkles, X } from "lucide-react";
+import { Check, ChevronDown, Mail, Minus, Plus, ShoppingCart, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { SiteLayout } from "@/components/SiteLayout";
@@ -13,10 +13,12 @@ import { categoryNames, toPriceItems } from "@/lib/service-content";
 import {
   decodeSelection,
   encodeSelection,
+  selectionSummary,
   selectionToLines,
   type PackageSelection,
 } from "@/lib/package-selection";
 import { packageQuoteSchema, submitPackageQuote } from "@/lib/api/package.functions";
+import { addBookingCartItem } from "@/lib/booking-cart";
 
 export const Route = createFileRoute("/build-your-package")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -44,6 +46,7 @@ export const Route = createFileRoute("/build-your-package")({
 });
 
 function BuilderPage() {
+  const navigate = useNavigate();
   const search = Route.useSearch();
   const { items, categories } = Route.useLoaderData();
   const priceItems = toPriceItems(items, ITEMS);
@@ -88,6 +91,32 @@ function BuilderPage() {
       return next;
     });
     toast.success("Swapped to the 4 risk assessment bundle - nice saving!");
+  };
+
+  const continueToBooking = async () => {
+    if (lines.length === 0) {
+      toast.error("Pick at least one item first.");
+      return;
+    }
+
+    const encodedSelection = encodeSelection(sel);
+    const result = addBookingCartItem({
+      serviceKey: "custom-package",
+      serviceLabel: "Custom compliance package",
+      serviceSource: "build-your-package",
+      paymentLink: "/build-your-package",
+      packageSelection: encodedSelection,
+      packageSummary: selectionSummary(sel, priceItems),
+      unitPrice: subTotal,
+      vatAmount: vatTotal,
+      quantity: 1,
+    });
+    toast.success(
+      result.added
+        ? "Your custom package was added to the booking cart."
+        : "This custom package is already in your booking cart.",
+    );
+    await navigate({ to: "/book" });
   };
 
   const emailQuote = async (e: React.FormEvent) => {
@@ -344,13 +373,12 @@ function BuilderPage() {
 
               <div className="space-y-3 border-t border-border p-4">
                 <Button
-                  asChild
+                  type="button"
                   className="w-full rounded-full gradient-purple-orange text-white"
                   disabled={lines.length === 0}
+                  onClick={() => void continueToBooking()}
                 >
-                  <Link to="/book" search={{ selection: encodeSelection(sel) }}>
-                    <Calendar className="mr-2 h-4 w-4" /> Book &amp; Pay
-                  </Link>
+                  <ShoppingCart className="mr-2 h-4 w-4" /> Continue to booking
                 </Button>
                 <form onSubmit={emailQuote} className="space-y-2">
                   <Input
@@ -389,13 +417,12 @@ function BuilderPage() {
             <div className="text-lg font-extrabold text-magenta">{formatGBP(grand)}</div>
           </div>
           <Button
-            asChild
+            type="button"
             className="rounded-full gradient-purple-orange text-white"
             disabled={lines.length === 0}
+            onClick={() => void continueToBooking()}
           >
-            <Link to="/book" search={{ selection: encodeSelection(sel) }}>
-              Book & Pay
-            </Link>
+            Continue to booking
           </Button>
         </div>
       </div>

@@ -14,15 +14,24 @@ const bookingSelectionSchema = z.object({
   packageSummary: z.string().trim().max(5000).default(""),
 });
 
+const bookingDetailScalarSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const bookingDetailValueSchema = z.union([
+  bookingDetailScalarSchema,
+  z.record(z.string(), bookingDetailScalarSchema),
+]);
+
 const submitDashboardBookingSchema = z.object({
   bookingId: z.string().uuid(),
   contactName: z.string().trim().min(1, "Full name is required.").max(100),
   contactEmail: z.string().trim().email("Enter a valid email address.").max(255),
   telephone: z.string().trim().min(1, "Telephone is required.").max(40),
-  practiceName: z.string().trim().min(1, "Name of practice is required.").max(150),
-  bookingDates: z.string().trim().min(4, "Choose at least one preferred date.").max(500),
-  bookingTime: z.string().trim().min(2, "Choose a preferred time.").max(120),
+  practiceName: z.string().trim().max(150).default(""),
+  bookingDates: z.string().trim().max(500).default(""),
+  bookingTime: z.string().trim().max(120).default(""),
   delegates: z.string().trim().max(40).optional().or(z.literal("")),
+  bookingScope: z.enum(["individual", "team", "practice", "resource"]).optional(),
+  fulfilmentType: z.enum(["onsite", "remote", "delivery", "subscription", "mixed"]).optional(),
+  bookingDetails: z.record(z.string(), bookingDetailValueSchema).optional().default({}),
 });
 
 const bookingIdSchema = z.object({

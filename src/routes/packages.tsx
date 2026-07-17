@@ -1,11 +1,14 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { toast } from "sonner";
 import { SiteLayout } from "@/components/SiteLayout";
 import { SectionHeading } from "@/components/SectionHeading";
 import { CTASection } from "@/components/CTASection";
 import { Button } from "@/components/ui/button";
 import { getPublicServiceItems } from "@/lib/api/service-content.functions";
 import { toPackageCards, toPackageComparisonRows } from "@/lib/service-content";
-import { Check, X } from "lucide-react";
+import { Check, ShoppingCart, X } from "lucide-react";
+import { addBookingCartItem } from "@/lib/booking-cart";
 
 export const Route = createFileRoute("/packages")({
   head: () => ({
@@ -43,6 +46,30 @@ function PackagesPage() {
     comparison,
     packages.map((item) => item.id),
   );
+  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+
+  const addPackage = (pkg: (typeof packages)[number]) => {
+    addBookingCartItem(
+      {
+        serviceKey: pkg.id,
+        serviceLabel: pkg.name,
+        serviceSource: "packages",
+        paymentLink: "/packages",
+        packageSelection: pkg.id,
+        packageSummary: `${pkg.name}\n${pkg.tagline}\nPrice: £${pkg.price}`,
+        unitPrice: Number(pkg.price),
+        vatAmount: 0,
+        quantity: 1,
+      },
+      { incrementExisting: false },
+    );
+    setRecentlyAdded(pkg.id);
+    window.setTimeout(
+      () => setRecentlyAdded((current) => (current === pkg.id ? null : current)),
+      1600,
+    );
+    toast.success(`${pkg.name} added to your booking cart.`);
+  };
 
   return (
     <SiteLayout>
@@ -83,12 +110,19 @@ function PackagesPage() {
                     ))}
                   </ul>
                   <Button
-                    asChild
+                    type="button"
                     className="mt-6 w-full rounded-full gradient-purple-orange text-white"
+                    onClick={() => addPackage(p)}
                   >
-                    <Link to="/book" search={{ package: p.id }}>
-                      Choose this package
-                    </Link>
+                    {recentlyAdded === p.id ? (
+                      <>
+                        <Check className="h-4 w-4" /> Added to cart
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="h-4 w-4" /> Add to booking cart
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

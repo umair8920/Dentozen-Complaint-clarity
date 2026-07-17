@@ -1,6 +1,7 @@
-import { UserBookingModel } from "../models/UserBooking";
+import { UserBookingModel, type BookingDetails } from "../models/UserBooking";
 import { TrainerScheduleModel } from "../models/TrainerSchedule";
 import { UserModel, type PublicUser } from "../models/User";
+import { serviceBookingProfile, serviceNeedsTrainer } from "../../src/lib/service-booking";
 
 type CreateSelectionInput = {
   user: PublicUser;
@@ -22,6 +23,9 @@ type SubmitBookingInput = {
   bookingDates: string;
   bookingTime: string;
   delegates?: string;
+  bookingScope?: "individual" | "team" | "practice" | "resource";
+  fulfilmentType?: "onsite" | "remote" | "delivery" | "subscription" | "mixed";
+  bookingDetails?: BookingDetails;
 };
 
 type BookingIdInput = {
@@ -105,7 +109,33 @@ export const UserBookingService = {
       throw new Error("Booked appointments cannot be changed from the user dashboard.");
     }
 
-    const assignment = await assignTrainer(existing.service_key);
+    const profile = serviceBookingProfile({
+      serviceKey: existing.service_key,
+      serviceSource: existing.service_source,
+      packageSelection: existing.package_selection,
+    });
+    const preferredDates = input.bookingDates
+      .split(",")
+      .map((date) => date.trim())
+      .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date));
+
+    if (profile.needsPreferredDates && preferredDates.length === 0) {
+      throw new Error("Choose at least one preferred date for this service.");
+    }
+    if (profile.needsPreferredDates && !input.bookingTime.trim()) {
+      throw new Error("Choose a preferred time for this service.");
+    }
+    if (profile.needsTeamDetails && !input.delegates?.trim()) {
+      throw new Error("Enter the number of delegates for this team training service.");
+    }
+
+    const assignment = serviceNeedsTrainer({
+      serviceKey: existing.service_key,
+      serviceSource: existing.service_source,
+      packageSelection: existing.package_selection,
+    })
+      ? await assignTrainer(existing.service_key)
+      : { trainerId: null, method: null };
     const booking = await UserBookingModel.submit({
       id: input.bookingId,
       userId: input.user.id,
@@ -116,6 +146,10 @@ export const UserBookingService = {
       bookingDates: input.bookingDates,
       bookingTime: input.bookingTime,
       delegates: input.delegates,
+      bookingScope: input.bookingScope ?? profile.scope,
+      fulfilmentType: input.fulfilmentType ?? profile.fulfilmentType,
+      bookingDetails: input.bookingDetails,
+      preferredDates,
       assignedTrainerId: assignment.trainerId,
       assignmentMethod: assignment.method,
     });
@@ -127,19 +161,29 @@ export const UserBookingService = {
     const { sendBookingEmail } = await import("../../src/lib/email.server");
     const fullUser = await UserModel.findById(input.user.id);
 
-    await sendBookingEmail({
-      fullName: input.contactName || fullUser?.name || input.user.name,
-      email: input.contactEmail || fullUser?.email || input.user.email,
-      telephone: input.telephone,
-      nameOfPractice: input.practiceName,
-      serviceRequired: booking.service_label,
-      bookingDates: input.bookingDates,
-      bookingTime: input.bookingTime,
-      delegates: input.delegates ?? "",
-      paymentLink: booking.payment_link,
-      packageSelection: booking.package_selection,
-      packageSummary: booking.package_summary,
-    });
+    try {
+      await sendBookingEmail({
+        fullName: input.contactName || fullUser?.name || input.user.name,
+        email: input.contactEmail || fullUser?.email || input.user.email,
+        telephone: input.telephone,
+        nameOfPractice: input.practiceName,
+        serviceRequired: booking.service_label,
+        bookingDates: input.bookingDates,
+        bookingTime: input.bookingTime,
+        delegates: input.delegates ?? "",
+        paymentLink: booking.payment_link,
+        packageSelection: booking.package_selection,
+        packageSummary: booking.package_summary,
+        bookingReference: booking.booking_reference,
+        bookingScope: booking.booking_scope,
+        fulfilmentType: booking.fulfilment_type,
+        bookingDetails: booking.booking_details,
+      });
+    } catch (error) {
+      // The booking is already committed. Do not make a mail-provider outage look like a failed
+      // booking and encourage the customer to submit a duplicate request.
+      console.error("Booking email could not be sent.", error);
+    }
 
     return UserBookingModel.toPublicBooking(booking);
   },
@@ -170,11 +214,17 @@ export const UserBookingService = {
       throw new Error("Only booked appointments can be cancelled.");
     }
 
-    const appointmentDate = bookingStartDate(existing.booking_dates, existing.booking_time);
+    const appointmentDate =
+      existing.confirmed_start ??
+      (existing.workflow_status === "confirmed"
+        ? bookingStartDate(existing.booking_dates, existing.booking_time)
+        : null);
     if (!appointmentDate) {
-      throw new Error(
-        "This booking cannot be cancelled online because the booking date is unclear.",
-      );
+      const cancelled = await UserBookingModel.cancelBooked(input.bookingId, input.user.id);
+      if (!cancelled) {
+        throw new Error("Booking could not be cancelled.");
+      }
+      return UserBookingModel.toPublicBooking(cancelled);
     }
 
     const cancellationDeadline = appointmentDate.getTime() - CANCELLATION_WINDOW_MS;

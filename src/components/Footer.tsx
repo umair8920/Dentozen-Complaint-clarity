@@ -53,7 +53,7 @@ export function Footer() {
             {[
               ["/resources", "Resources"],
               ["/contact", "Contact"],
-              ["/book", "Book Now"],
+              ["/book", "Booking Cart"],
               ["/privacy", "Privacy Policy"],
             ].map(([to, label]) => (
               <li key={to}>

@@ -6,6 +6,7 @@ const serviceSectionSchema = z.enum([
   "build-your-package",
   "packages",
   "package-comparison",
+  "resources",
 ]);
 
 export const getPublicServiceItems = createServerFn({ method: "POST" })

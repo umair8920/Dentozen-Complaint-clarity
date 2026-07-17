@@ -69,7 +69,7 @@ function SquatPage() {
               size="lg"
               className="rounded-full bg-white text-magenta hover:bg-white/90"
             >
-              <Link to="/book">
+              <Link to="/book" search={{ service: "consultation" }}>
                 Book a Free Consultation <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -105,7 +105,9 @@ function SquatPage() {
               description="Preparing the application, registered manager support, policies and procedures, RPA, risk assessments — everything needed to get registered correctly first time."
             />
             <Button asChild className="mt-6 rounded-full gradient-purple-orange text-white">
-              <Link to="/book">Start my registration</Link>
+              <Link to="/book" search={{ service: "cqc-registration" }}>
+                Start my registration
+              </Link>
             </Button>
           </div>
           <div className="rounded-3xl border border-border bg-background p-6 shadow-soft">
@@ -152,7 +154,9 @@ function SquatPage() {
               size="lg"
               className="rounded-full bg-white text-magenta hover:bg-white/90"
             >
-              <Link to="/book">Get help appealing</Link>
+              <Link to="/book" search={{ service: "cqc-appeal" }}>
+                Get help appealing
+              </Link>
             </Button>
           </div>
         </div>

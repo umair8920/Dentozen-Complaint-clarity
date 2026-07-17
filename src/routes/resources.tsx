@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { BookOpen, Download, FileText } from "lucide-react";
+import { BookOpen, Check, Download, FileText, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 
 import { SiteLayout } from "@/components/SiteLayout";
@@ -8,6 +8,10 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ITEMS, formatGBP } from "@/lib/pricing";
+import { getPublicServiceItems } from "@/lib/api/service-content.functions";
+import { addBookingCartItem } from "@/lib/booking-cart";
+import { encodeSelection } from "@/lib/package-selection";
+import { toResourceCards } from "@/lib/service-content";
 
 export const Route = createFileRoute("/resources")({
   head: () => ({
@@ -27,6 +31,14 @@ export const Route = createFileRoute("/resources")({
     ],
     links: [{ rel: "canonical", href: "/resources" }],
   }),
+  loader: async () => {
+    try {
+      return await getPublicServiceItems({ data: { section: "resources" } });
+    } catch (error) {
+      console.error("Database-backed resources could not load; using static fallback.", error);
+      return null;
+    }
+  },
   component: ResourcesPage,
 });
 
@@ -42,8 +54,46 @@ const PAID_RESOURCES: { title: string; price: number; desc: string }[] = [
 ];
 
 function ResourcesPage() {
+  const resourceContent = Route.useLoaderData();
   const [email, setEmail] = useState("");
-  const logbooks = ITEMS.filter((i) => i.id.startsWith("log-"));
+  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+  const fallbackLogbooks = ITEMS.filter((item) => item.id.startsWith("log-"));
+  const logbooks = toResourceCards(resourceContent?.items, fallbackLogbooks);
+
+  const addLogbook = (logbook: (typeof logbooks)[number]) => {
+    const result = addBookingCartItem(
+      {
+        serviceKey: logbook.id,
+        serviceLabel: logbook.name,
+        serviceSource: "resources",
+        paymentLink: "/resources",
+        packageSelection: encodeSelection({ [logbook.id]: 1 }),
+        packageSummary: [
+          logbook.name,
+          logbook.description,
+          `Price: ${logbook.priceLabel ?? formatGBP(logbook.price)}${logbook.exVat ? " +VAT" : ""}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        unitPrice: logbook.price,
+        vatAmount: logbook.exVat ? logbook.price * 0.2 : 0,
+        quantity: 1,
+      },
+      { incrementExisting: logbook.allowQuantity },
+    );
+    if (result.added) {
+      setRecentlyAdded(logbook.id);
+      window.setTimeout(
+        () => setRecentlyAdded((current) => (current === logbook.id ? null : current)),
+        1600,
+      );
+    }
+    toast.success(
+      result.added
+        ? `${logbook.name} added to your booking cart.`
+        : `${logbook.name} is already in your booking cart.`,
+    );
+  };
 
   return (
     <SiteLayout>
@@ -105,34 +155,62 @@ function ResourcesPage() {
         <div className="mx-auto max-w-7xl">
           <SectionHeading
             title="Compliance logbooks"
-            description="Practical, role-specific logbooks - GBP 49.99 each."
+            description="Practical, role-specific logbooks. Add what you need and complete everything through the booking cart."
           />
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {logbooks.map((b, i) => (
-              <div
-                key={b.id}
-                className="overflow-hidden rounded-3xl border border-border bg-background shadow-soft"
-              >
+          {logbooks.length === 0 ? (
+            <div className="mt-8 rounded-3xl border border-dashed border-border bg-background p-10 text-center text-muted-foreground">
+              No compliance logbooks are currently available.
+            </div>
+          ) : (
+            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {logbooks.map((b) => (
                 <div
-                  className={`h-28 ${["gradient-teal-purple", "gradient-purple-orange", "gradient-orange-gold", "gradient-blue-teal"][i % 4]} flex items-end p-4`}
+                  key={b.id}
+                  className="group overflow-hidden rounded-3xl border border-border bg-background shadow-soft transition duration-200 hover:-translate-y-1 hover:shadow-card"
                 >
-                  <BookOpen className="h-7 w-7 text-white" />
+                  <div className={`flex h-28 items-end p-4 ${b.gradient}`}>
+                    <BookOpen className="h-7 w-7 text-white" />
+                  </div>
+                  <div className="flex min-h-48 flex-col p-5">
+                    <h3 className="font-bold">{b.name}</h3>
+                    {b.description ? (
+                      <p className="mt-2 text-sm text-muted-foreground">{b.description}</p>
+                    ) : null}
+                    <div className="mt-2 font-extrabold text-magenta">
+                      {b.priceLabel ?? formatGBP(b.price)}
+                      {b.exVat ? (
+                        <span className="ml-1 text-xs font-medium text-muted-foreground">+VAT</span>
+                      ) : null}
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => addLogbook(b)}
+                      className="mt-auto w-full rounded-full gradient-purple-orange text-white"
+                    >
+                      {recentlyAdded === b.id ? (
+                        <>
+                          <Check className="h-4 w-4" /> Added
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart className="h-4 w-4" /> Add to cart
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
-                <div className="p-5">
-                  <h3 className="font-bold">{b.name}</h3>
-                  <div className="mt-1 text-magenta font-extrabold">{formatGBP(b.price)}</div>
-                  <Button
-                    onClick={() =>
-                      toast.success(`${b.name} added - checkout opens on the next step`)
-                    }
-                    className="mt-4 w-full rounded-full gradient-purple-orange text-white"
-                  >
-                    Buy
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
+          {logbooks.length > 0 ? (
+            <div className="mt-8 text-center">
+              <Button asChild variant="outline" className="rounded-full border-2">
+                <Link to="/book">
+                  <ShoppingCart className="h-4 w-4" /> View booking cart
+                </Link>
+              </Button>
+            </div>
+          ) : null}
         </div>
       </section>
 

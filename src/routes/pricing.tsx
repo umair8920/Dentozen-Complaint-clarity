@@ -1,4 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Check, ShoppingCart } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { SiteLayout } from "@/components/SiteLayout";
 import { SectionHeading } from "@/components/SectionHeading";
 import { CTASection } from "@/components/CTASection";
@@ -6,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { ITEMS, formatGBP } from "@/lib/pricing";
 import { getPublicServiceItems } from "@/lib/api/service-content.functions";
 import { categoryNames, toPriceItems } from "@/lib/service-content";
-import { encodeSelection } from "@/lib/package-selection";
+import { encodeSelection, selectionSummary } from "@/lib/package-selection";
+import { addBookingCartItem } from "@/lib/booking-cart";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -34,6 +38,31 @@ function PricingPage() {
     ITEMS.filter((item) => item.category !== "Packages"),
   );
   const visibleCategories = categoryNames(categories, priceItems);
+  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+
+  const addItem = (item: (typeof priceItems)[number]) => {
+    const selection = { [item.id]: 1 };
+    addBookingCartItem(
+      {
+        serviceKey: item.id,
+        serviceLabel: item.name,
+        serviceSource: "pricing",
+        paymentLink: "/pricing",
+        packageSelection: encodeSelection(selection),
+        packageSummary: selectionSummary(selection, priceItems),
+        unitPrice: item.tbd ? null : item.price,
+        vatAmount: item.exVat && !item.tbd ? item.price * 0.2 : 0,
+        quantity: 1,
+      },
+      { incrementExisting: item.allowQuantity === true },
+    );
+    setRecentlyAdded(item.id);
+    window.setTimeout(
+      () => setRecentlyAdded((current) => (current === item.id ? null : current)),
+      1600,
+    );
+    toast.success(`${item.name} added to your booking cart.`);
+  };
 
   return (
     <SiteLayout>
@@ -52,7 +81,9 @@ function PricingPage() {
               </Link>
             </Button>
             <Button asChild variant="outline" className="rounded-full border-2">
-              <Link to="/book">Book a service</Link>
+              <Link to="/book">
+                <ShoppingCart className="h-4 w-4" /> View booking cart
+              </Link>
             </Button>
           </div>
         </div>
@@ -108,13 +139,22 @@ function PricingPage() {
                             </div>
                           )}
                         </div>
-                        <Button asChild size="sm" variant="outline" className="rounded-full">
-                          <Link
-                            to="/build-your-package"
-                            search={{ selection: encodeSelection({ [it.id]: 1 }) }}
-                          >
-                            Add
-                          </Link>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full"
+                          onClick={() => addItem(it)}
+                        >
+                          {recentlyAdded === it.id ? (
+                            <>
+                              <Check className="h-4 w-4" /> Added
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart className="h-4 w-4" /> Add
+                            </>
+                          )}
                         </Button>
                       </div>
                     </li>

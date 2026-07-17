@@ -1,6 +1,11 @@
 import { getPool, query } from "../db/pool";
 
-export type ServiceSection = "pricing" | "build-your-package" | "packages" | "package-comparison";
+export type ServiceSection =
+  | "pricing"
+  | "build-your-package"
+  | "packages"
+  | "package-comparison"
+  | "resources";
 export type ServiceItemStatus = "active" | "draft";
 export type JsonValue =
   | string
@@ -120,6 +125,7 @@ export const ServiceItemModel = {
       "build-your-package": 0,
       packages: 0,
       "package-comparison": 0,
+      resources: 0,
     } as Record<ServiceSection, number>);
   },
 

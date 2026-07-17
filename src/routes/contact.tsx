@@ -202,7 +202,7 @@ function ContactPage() {
                 Grab a slot in our calendar - it takes 2 minutes.
               </p>
               <Button asChild className="mt-4 rounded-full bg-white text-teal hover:bg-white/90">
-                <Link to="/book">
+                <Link to="/book" search={{ service: "consultation" }}>
                   <Calendar className="mr-2 h-4 w-4" /> Book a call
                 </Link>
               </Button>

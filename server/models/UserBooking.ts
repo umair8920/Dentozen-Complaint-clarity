@@ -1,6 +1,13 @@
 import { query } from "../db/pool";
 
 export type UserBookingStatus = "selected" | "booked" | "cancelled";
+export type BookingDetailValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: string | number | boolean | null };
+export type BookingDetails = { [key: string]: BookingDetailValue };
 
 export type UserBookingRecord = {
   id: string;
@@ -24,6 +31,19 @@ export type UserBookingRecord = {
   assigned_trainer_id: string | null;
   assigned_at: Date | null;
   assignment_method: string | null;
+  booking_reference: string;
+  booking_scope: "individual" | "team" | "practice" | "resource";
+  fulfilment_type: "onsite" | "remote" | "delivery" | "subscription" | "mixed";
+  workflow_status: string;
+  booking_details: BookingDetails;
+  preferred_dates: string[];
+  confirmed_start: Date | null;
+  confirmed_end: Date | null;
+  completed_at: Date | null;
+  next_due_date: string | null;
+  certificate_sent_at: Date | null;
+  supplier_name: string | null;
+  legacy_import: BookingDetails;
   created_at: Date;
   updated_at: Date;
 };
@@ -48,11 +68,22 @@ export type SubmitUserBookingInput = {
   bookingDates: string;
   bookingTime: string;
   delegates?: string;
+  bookingScope?: "individual" | "team" | "practice" | "resource";
+  fulfilmentType?: "onsite" | "remote" | "delivery" | "subscription" | "mixed";
+  bookingDetails?: BookingDetails;
+  preferredDates?: string[];
   assignedTrainerId?: string | null;
   assignmentMethod?: string | null;
 };
 
 function toPublicBooking(booking: UserBookingRecord) {
+  const dateOnly = (value: unknown) => {
+    if (value instanceof Date) {
+      return value.toISOString().slice(0, 10);
+    }
+    return typeof value === "string" ? value.slice(0, 10) : null;
+  };
+
   return {
     id: booking.id,
     serviceKey: booking.service_key,
@@ -74,6 +105,21 @@ function toPublicBooking(booking: UserBookingRecord) {
     assignedTrainerId: booking.assigned_trainer_id,
     assignedAt: booking.assigned_at?.toISOString() ?? null,
     assignmentMethod: booking.assignment_method,
+    bookingReference: booking.booking_reference,
+    bookingScope: booking.booking_scope,
+    fulfilmentType: booking.fulfilment_type,
+    workflowStatus: booking.workflow_status,
+    bookingDetails: booking.booking_details,
+    preferredDates: booking.preferred_dates
+      .map(dateOnly)
+      .filter((value): value is string => !!value),
+    confirmedStart: booking.confirmed_start?.toISOString() ?? null,
+    confirmedEnd: booking.confirmed_end?.toISOString() ?? null,
+    completedAt: booking.completed_at?.toISOString() ?? null,
+    nextDueDate: dateOnly(booking.next_due_date),
+    certificateSentAt: booking.certificate_sent_at?.toISOString() ?? null,
+    supplierName: booking.supplier_name,
+    legacyImport: booking.legacy_import,
     createdAt: booking.created_at.toISOString(),
   };
 }
@@ -124,6 +170,7 @@ export const UserBookingModel = {
     const result = await query<UserBookingRecord>(
       `update user_booking_requests
        set status = 'booked',
+           workflow_status = 'submitted',
            contact_name = $3,
            contact_email = $4,
            telephone = $5,
@@ -131,9 +178,13 @@ export const UserBookingModel = {
            booking_dates = $7,
            booking_time = $8,
            delegates = $9,
-           assigned_trainer_id = $10,
-           assigned_at = case when $10::uuid is null then assigned_at else now() end,
-           assignment_method = $11,
+           booking_scope = $10,
+           fulfilment_type = $11,
+           booking_details = $12::jsonb,
+           preferred_dates = $13::date[],
+           assigned_trainer_id = $14,
+           assigned_at = case when $14::uuid is null then assigned_at else now() end,
+           assignment_method = $15,
            submitted_at = now(),
            updated_at = now()
        where id = $1 and user_id = $2
@@ -148,6 +199,10 @@ export const UserBookingModel = {
         input.bookingDates,
         input.bookingTime,
         input.delegates ?? "",
+        input.bookingScope ?? "practice",
+        input.fulfilmentType ?? "onsite",
+        JSON.stringify(input.bookingDetails ?? {}),
+        input.preferredDates ?? [],
         input.assignedTrainerId ?? null,
         input.assignmentMethod ?? null,
       ],
@@ -205,6 +260,7 @@ export const UserBookingModel = {
     const result = await query<UserBookingRecord>(
       `update user_booking_requests
        set status = 'cancelled',
+           workflow_status = 'cancelled',
            cancelled_at = now(),
            updated_at = now()
        where id = $1 and user_id = $2 and status = 'booked'

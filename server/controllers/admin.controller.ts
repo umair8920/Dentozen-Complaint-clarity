@@ -68,14 +68,14 @@ export const AdminController = {
   },
 
   async serviceItems(input: {
-    section?: "pricing" | "build-your-package" | "packages" | "package-comparison";
+    section?: "pricing" | "build-your-package" | "packages" | "package-comparison" | "resources";
   }) {
     await requireAdmin();
     return ServiceContentService.list(input.section);
   },
 
   async createServiceItem(input: {
-    section: "pricing" | "build-your-package" | "packages" | "package-comparison";
+    section: "pricing" | "build-your-package" | "packages" | "package-comparison" | "resources";
     title: string;
     description?: string;
     price?: number | null;

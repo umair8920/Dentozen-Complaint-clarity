@@ -45,7 +45,7 @@ function ForgotPasswordPage() {
           <h2 className="text-2xl font-extrabold">Forgot password</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Remembered it?{" "}
-            <Link to="/login" className="font-semibold text-magenta">
+            <Link to="/login" search={{ next: undefined }} className="font-semibold text-magenta">
               Login
             </Link>
           </p>

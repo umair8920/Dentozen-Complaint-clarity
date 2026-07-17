@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { SiteLayout } from "@/components/SiteLayout";
 import { completeGoogleLogin } from "@/lib/api/auth.functions";
-import { syncPendingBookingSelection } from "@/lib/pending-booking";
+import { consumeAuthReturnPath } from "@/lib/booking-cart";
 
 type GoogleSearch = {
   code?: string;
@@ -28,7 +28,7 @@ function GoogleCallbackPage() {
     async function complete() {
       if (!search.code || !search.state) {
         toast.error("Google did not return the expected sign-in details.");
-        await navigate({ to: "/login" });
+        await navigate({ to: "/login", search: { next: undefined } });
         return;
       }
 
@@ -40,18 +40,16 @@ function GoogleCallbackPage() {
             redirectUri: `${window.location.origin}/auth/google/callback`,
           },
         });
-        try {
-          await syncPendingBookingSelection();
-        } catch (error) {
-          toast.error(
-            error instanceof Error ? error.message : "Saved booking could not be synced.",
-          );
-        }
         toast.success("Signed in with Google.");
-        await navigate({ to: "/dashboard" });
+        const next = consumeAuthReturnPath();
+        if (next === "/dashboard") {
+          await navigate({ to: "/dashboard" });
+        } else {
+          window.location.assign(next);
+        }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Google sign-in failed.");
-        await navigate({ to: "/login" });
+        await navigate({ to: "/login", search: { next: undefined } });
       }
     }
 

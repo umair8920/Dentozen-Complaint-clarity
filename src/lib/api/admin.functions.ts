@@ -8,6 +8,7 @@ const serviceSectionSchema = z.enum([
   "build-your-package",
   "packages",
   "package-comparison",
+  "resources",
 ]);
 const serviceItemStatusSchema = z.enum(["active", "draft"]);
 

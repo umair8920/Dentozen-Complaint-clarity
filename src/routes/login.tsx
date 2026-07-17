@@ -9,13 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getGoogleAuthUrl, login, loginSchema } from "@/lib/api/auth.functions";
-import { syncPendingBookingSelection } from "@/lib/pending-booking";
+import { consumeAuthReturnPath, safeLocalPath, saveAuthReturnPath } from "@/lib/booking-cart";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    next: typeof search.next === "string" ? safeLocalPath(search.next) : undefined,
+  }),
   component: LoginPage,
 });
 
 function LoginPage() {
+  const search = Route.useSearch();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,13 +32,14 @@ function LoginPage() {
     try {
       setIsSubmitting(true);
       await login({ data: parsed.data });
-      try {
-        await syncPendingBookingSelection();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Saved booking could not be synced.");
-      }
       toast.success("Welcome back.");
-      await navigate({ to: "/dashboard" });
+      const savedNext = consumeAuthReturnPath();
+      const next = safeLocalPath(search.next || savedNext);
+      if (next === "/dashboard") {
+        await navigate({ to: "/dashboard" });
+      } else {
+        window.location.assign(next);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Login failed.");
     } finally {
@@ -44,6 +49,7 @@ function LoginPage() {
 
   const continueWithGoogle = async () => {
     try {
+      saveAuthReturnPath(search.next || "/dashboard");
       const redirectUri = `${window.location.origin}/auth/google/callback`;
       const result = await getGoogleAuthUrl({ data: { redirectUri } });
       window.location.assign(result.url);
@@ -63,7 +69,11 @@ function LoginPage() {
           <h2 className="text-2xl font-extrabold">Login</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             New here?{" "}
-            <Link to="/signup" className="font-semibold text-magenta">
+            <Link
+              to="/signup"
+              search={{ next: search.next }}
+              className="font-semibold text-magenta"
+            >
               Create an account
             </Link>
           </p>

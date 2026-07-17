@@ -23,7 +23,7 @@ export function CTASection({
               size="lg"
               className="rounded-full bg-white text-magenta hover:bg-white/90"
             >
-              <Link to="/book">
+              <Link to="/book" search={{ service: "consultation" }}>
                 Book Now <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>

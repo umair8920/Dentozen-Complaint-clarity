@@ -27,6 +27,13 @@ type BookingEmailInput = {
   packageSelection?: string;
   packageSummary?: string;
   packageTotal?: string;
+  bookingReference?: string;
+  bookingScope?: string;
+  fulfilmentType?: string;
+  bookingDetails?: Record<
+    string,
+    string | number | boolean | null | Record<string, string | number | boolean | null>
+  >;
 };
 
 type PackageQuoteInput = {
@@ -149,6 +156,17 @@ export async function sendBookingEmail(input: BookingEmailInput) {
   const packageBlock = packageSummary.trim()
     ? `\n\n${packageSummary}${packageTotalLine ? `\n${packageTotalLine}` : ""}`
     : "";
+  const bookingDetails = Object.entries(input.bookingDetails ?? {})
+    .filter(([, value]) => value !== "" && value !== null && value !== undefined)
+    .map(([key, value]) => `${humaniseKey(key)}: ${formatDetailValue(value)}`);
+  const bookingDetailsText = bookingDetails.length
+    ? ["", "Service-specific details:", ...bookingDetails].join("\n")
+    : "";
+  const bookingDetailsHtml = bookingDetails.length
+    ? `<h3>Service-specific details</h3><ul>${bookingDetails
+        .map((line) => `<li>${escapeHtml(line)}</li>`)
+        .join("")}</ul>`
+    : "";
 
   await transporter.sendMail({
     to: toEmail,
@@ -158,24 +176,31 @@ export async function sendBookingEmail(input: BookingEmailInput) {
     text: [
       "New booking request",
       "",
+      `Reference: ${input.bookingReference || "Pending"}`,
       `Full name: ${input.fullName}`,
       `Email: ${input.email}`,
       `Telephone: ${input.telephone}`,
       `Name of practice: ${input.nameOfPractice}`,
       `Service required: ${input.serviceRequired}`,
+      `Scope: ${input.bookingScope || "practice"}`,
+      `Fulfilment: ${input.fulfilmentType || "onsite"}`,
       `Preferred dates: ${input.bookingDates}`,
       `Timing of booking: ${input.bookingTime}`,
       `Delegates: ${delegatesLine}`,
       `Payment link: ${input.paymentLink}`,
       packageBlock ? `Package selection:${packageBlock}` : "",
+      bookingDetailsText,
     ].join("\n"),
     html: `
       <h2>New booking request</h2>
+      <p><strong>Reference:</strong> ${escapeHtml(input.bookingReference || "Pending")}</p>
       <p><strong>Full name:</strong> ${escapeHtml(input.fullName)}</p>
       <p><strong>Email:</strong> ${escapeHtml(input.email)}</p>
       <p><strong>Telephone:</strong> ${escapeHtml(input.telephone)}</p>
       <p><strong>Name of practice:</strong> ${escapeHtml(input.nameOfPractice)}</p>
       <p><strong>Service required:</strong> ${escapeHtml(input.serviceRequired)}</p>
+      <p><strong>Scope:</strong> ${escapeHtml(input.bookingScope || "practice")}</p>
+      <p><strong>Fulfilment:</strong> ${escapeHtml(input.fulfilmentType || "onsite")}</p>
       <p><strong>Preferred dates:</strong></p>
       <p>${escapeHtml(input.bookingDates).replace(/\n/g, "<br />")}</p>
       <p><strong>Timing of booking:</strong> ${escapeHtml(input.bookingTime)}</p>
@@ -186,8 +211,26 @@ export async function sendBookingEmail(input: BookingEmailInput) {
           ? `<p><strong>Package selection:</strong></p><pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(packageSummary)}${packageTotalLine ? `\n${escapeHtml(packageTotalLine)}` : ""}</pre>`
           : ""
       }
+      ${bookingDetailsHtml}
     `,
   });
+}
+
+function humaniseKey(value: string) {
+  return value
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
+function formatDetailValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.join(", ");
+  }
+  if (typeof value === "object" && value) {
+    return Object.values(value).filter(Boolean).join(", ");
+  }
+  return String(value);
 }
 
 export async function sendPackageQuoteEmail(input: PackageQuoteInput) {

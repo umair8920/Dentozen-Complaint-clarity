@@ -14,7 +14,7 @@ type Metadata = { [key: string]: JsonValue };
 export type PublicServiceContentItem = {
   id: string;
   contentKey: string | null;
-  section: "pricing" | "build-your-package" | "packages" | "package-comparison";
+  section: "pricing" | "build-your-package" | "packages" | "package-comparison" | "resources";
   title: string;
   description: string;
   price: number | null;
@@ -45,6 +45,17 @@ export type PackageComparisonRow = {
   id: string;
   label: string;
   includedPackageIds: string[];
+};
+
+export type ResourceCardContent = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  priceLabel?: string;
+  allowQuantity: boolean;
+  exVat: boolean;
+  gradient: string;
 };
 
 const UNITS: Unit[] = ["each", "month", "year", "item", "service"];
@@ -156,5 +167,47 @@ export function toPackageComparisonRows(
           (packageId): packageId is string => typeof packageId === "string",
         )
       : [],
+  }));
+}
+
+export function toResourceCards(
+  items: PublicServiceContentItem[] | undefined,
+  fallback: PriceItem[],
+): ResourceCardContent[] {
+  if (items === undefined) {
+    return fallback.map((item, index) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description ?? "",
+      price: item.price,
+      priceLabel: item.priceLabel,
+      allowQuantity: item.allowQuantity ?? true,
+      exVat: item.exVat ?? false,
+      gradient: [
+        "gradient-teal-purple",
+        "gradient-purple-orange",
+        "gradient-orange-gold",
+        "gradient-blue-teal",
+      ][index % 4],
+    }));
+  }
+
+  return items.map((item, index) => ({
+    id: itemId(item),
+    name: item.title,
+    description: item.description,
+    price: item.price ?? 0,
+    priceLabel: stringValue(item.metadata?.priceLabel) || undefined,
+    allowQuantity: booleanValue(item.metadata?.allowQuantity),
+    exVat: booleanValue(item.metadata?.exVat),
+    gradient: stringValue(
+      item.metadata?.gradient,
+      [
+        "gradient-teal-purple",
+        "gradient-purple-orange",
+        "gradient-orange-gold",
+        "gradient-blue-teal",
+      ][index % 4],
+    ),
   }));
 }

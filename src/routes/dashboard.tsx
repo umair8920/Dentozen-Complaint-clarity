@@ -90,6 +90,7 @@ import {
   setTrainerWorkingDay,
   updateTrainerSlot,
 } from "@/lib/api/trainer.functions";
+import { serviceBookingProfile } from "@/lib/service-booking";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
@@ -105,7 +106,7 @@ function DashboardPage() {
       try {
         const result = await getDashboard();
         if (!result.user || !result.dashboard) {
-          await navigate({ to: "/login" });
+          await navigate({ to: "/login", search: { next: undefined } });
           return;
         }
         setData(result);
@@ -333,6 +334,7 @@ function UserDashboard({ user }: { user: PublicUser }) {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Service</TableHead>
+                      <TableHead>Reference</TableHead>
                       <TableHead>Source</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Preferred dates</TableHead>
@@ -346,10 +348,11 @@ function UserDashboard({ user }: { user: PublicUser }) {
                     {bookings.map((booking) => (
                       <TableRow key={booking.id}>
                         <TableCell className="font-medium">{booking.serviceLabel}</TableCell>
+                        <TableCell>{booking.bookingReference}</TableCell>
                         <TableCell>{sourceLabel(booking.serviceSource)}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="rounded-full capitalize">
-                            {booking.status}
+                            {booking.workflowStatus ?? booking.status}
                           </Badge>
                         </TableCell>
                         <TableCell>{booking.bookingDates ?? "Pending"}</TableCell>
@@ -535,7 +538,13 @@ function firstBookingDate(booking: UserBooking) {
 }
 
 function canCancelBooking(booking: UserBooking) {
-  const date = firstBookingDate(booking);
+  if (!booking.confirmedStart && booking.workflowStatus !== "confirmed") {
+    return true;
+  }
+
+  const date = booking.confirmedStart
+    ? new Date(booking.confirmedStart)
+    : firstBookingDate(booking);
   if (!date) {
     return false;
   }
@@ -563,6 +572,7 @@ function BookingDetailsDialog({
   if (!booking || !form) {
     return null;
   }
+  const profile = serviceBookingProfile(booking);
 
   return (
     <Dialog open={Boolean(booking)} onOpenChange={onOpenChange}>
@@ -621,49 +631,53 @@ function BookingDetailsDialog({
               />
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          {profile.needsPreferredDates ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <Label htmlFor={`${booking.id}-date-1`}>Preferred date</Label>
+                <Input
+                  id={`${booking.id}-date-1`}
+                  type="date"
+                  className="mt-1"
+                  value={form.firstDate}
+                  onChange={(event) => onChange({ firstDate: event.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor={`${booking.id}-date-2`}>Second option</Label>
+                <Input
+                  id={`${booking.id}-date-2`}
+                  type="date"
+                  className="mt-1"
+                  value={form.secondDate}
+                  onChange={(event) => onChange({ secondDate: event.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor={`${booking.id}-date-3`}>Third option</Label>
+                <Input
+                  id={`${booking.id}-date-3`}
+                  type="date"
+                  className="mt-1"
+                  value={form.thirdDate}
+                  onChange={(event) => onChange({ thirdDate: event.target.value })}
+                />
+              </div>
+            </div>
+          ) : null}
+          {profile.needsPreferredDates ? (
             <div>
-              <Label htmlFor={`${booking.id}-date-1`}>Preferred date</Label>
+              <Label htmlFor={`${booking.id}-time`}>Preferred time</Label>
               <Input
-                id={`${booking.id}-date-1`}
-                type="date"
+                id={`${booking.id}-time`}
                 className="mt-1"
-                value={form.firstDate}
-                onChange={(event) => onChange({ firstDate: event.target.value })}
+                placeholder="Morning, afternoon, or 10:00 to 13:00"
+                value={form.bookingTime}
+                onChange={(event) => onChange({ bookingTime: event.target.value })}
               />
             </div>
-            <div>
-              <Label htmlFor={`${booking.id}-date-2`}>Second option</Label>
-              <Input
-                id={`${booking.id}-date-2`}
-                type="date"
-                className="mt-1"
-                value={form.secondDate}
-                onChange={(event) => onChange({ secondDate: event.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor={`${booking.id}-date-3`}>Third option</Label>
-              <Input
-                id={`${booking.id}-date-3`}
-                type="date"
-                className="mt-1"
-                value={form.thirdDate}
-                onChange={(event) => onChange({ thirdDate: event.target.value })}
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor={`${booking.id}-time`}>Preferred time</Label>
-            <Input
-              id={`${booking.id}-time`}
-              className="mt-1"
-              placeholder="Morning, afternoon, or 10:00 to 13:00"
-              value={form.bookingTime}
-              onChange={(event) => onChange({ bookingTime: event.target.value })}
-            />
-          </div>
-          {booking.serviceKey === "training-session" ? (
+          ) : null}
+          {profile.needsTeamDetails ? (
             <div>
               <Label htmlFor={`${booking.id}-delegates`}>Number of delegates</Label>
               <Input
@@ -697,6 +711,7 @@ function sourceLabel(source: string) {
     pricing: "/pricing",
     "build-your-package": "/build-your-package",
     packages: "/packages",
+    resources: "/resources",
     direct: "Direct",
   };
 
@@ -1598,6 +1613,7 @@ const SERVICE_SECTIONS: { id: ServiceSectionInput; label: string; route: string 
   { id: "build-your-package", label: "Build Package", route: "/build-your-package" },
   { id: "packages", label: "Packages", route: "/packages" },
   { id: "package-comparison", label: "Package Compare", route: "/packages" },
+  { id: "resources", label: "Resources", route: "/resources" },
 ];
 const GRADIENT_OPTIONS = [
   { value: "gradient-teal-purple", label: "Teal to purple" },
@@ -2227,6 +2243,7 @@ function AdminServices({
     activeSection === "pricing" || activeSection === "build-your-package";
   const isPackagesSection = activeSection === "packages";
   const isPackageComparisonSection = activeSection === "package-comparison";
+  const isResourcesSection = activeSection === "resources";
 
   const parseMetadata = (metadataJson: string) =>
     JSON.parse(metadataJson.trim() || "{}") as Record<string, unknown>;
@@ -2294,6 +2311,13 @@ function AdminServices({
       }
     }
 
+    if (isResourcesSection) {
+      setString("resourceType", "logbook");
+      setString("gradient", form.gradient);
+      setBoolean("allowQuantity", form.allowQuantity);
+      setBoolean("exVat", form.exVat);
+    }
+
     if (isPackageComparisonSection) {
       if (form.includedPackageIds.length > 0) {
         metadata.includedPackageIds = form.includedPackageIds;
@@ -2328,7 +2352,20 @@ function AdminServices({
       popular: false,
       features: "",
       includedPackageIds: [],
-      metadata: JSON.stringify({ route: `/${activeSection}` }, null, 2),
+      metadata: JSON.stringify(
+        {
+          route: `/${activeSection}`,
+          ...(isResourcesSection
+            ? {
+                resourceType: "logbook",
+                allowQuantity: true,
+                gradient: "gradient-teal-purple",
+              }
+            : {}),
+        },
+        null,
+        2,
+      ),
     });
     setModalOpen(true);
   };
@@ -2503,7 +2540,7 @@ function AdminServices({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {SERVICE_SECTIONS.map((section, index) => (
           <Card key={section.id} className="rounded-2xl shadow-soft">
             <CardContent className="flex items-center justify-between p-5">
@@ -2538,7 +2575,8 @@ function AdminServices({
           <div>
             <CardTitle>Editable route content</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Manage content shown for pricing, package builder, packages and package comparison.
+              Manage content shown for pricing, package builder, packages, package comparison and
+              resources.
             </p>
           </div>
           <Button className="rounded-full gradient-purple-orange text-white" onClick={openCreate}>
@@ -2923,6 +2961,55 @@ function AdminServices({
                       onChange={(event) => setForm({ ...form, features: event.target.value })}
                       placeholder="One feature per line"
                     />
+                  </div>
+                </div>
+              </div>
+            )}
+            {isResourcesSection && (
+              <div className="rounded-2xl border border-border bg-muted/20 p-4">
+                <div>
+                  <h4 className="font-semibold">Logbook display and cart behavior</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Controls the card appearance and how this resource is added to the booking cart.
+                  </p>
+                </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="resource-gradient">Color style</Label>
+                    <select
+                      id="resource-gradient"
+                      className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={form.gradient}
+                      onChange={(event) => setForm({ ...form, gradient: event.target.value })}
+                    >
+                      {GRADIENT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2 sm:pt-6">
+                    <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-magenta"
+                        checked={form.allowQuantity}
+                        onChange={(event) =>
+                          setForm({ ...form, allowQuantity: event.target.checked })
+                        }
+                      />
+                      Allow quantity
+                    </label>
+                    <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-magenta"
+                        checked={form.exVat}
+                        onChange={(event) => setForm({ ...form, exVat: event.target.checked })}
+                      />
+                      Price is +VAT
+                    </label>
                   </div>
                 </div>
               </div>

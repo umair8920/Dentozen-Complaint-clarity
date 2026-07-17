@@ -122,7 +122,7 @@ function HomePage() {
                   variant="outline"
                   className="rounded-full border-2 border-white bg-transparent text-white hover:bg-white/10"
                 >
-                  <Link to="/book">
+                  <Link to="/book" search={{ service: "consultation" }}>
                     Book a Call <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
